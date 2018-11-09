@@ -8,6 +8,7 @@ Created on Fri Nov  9 09:21:21 2018
 import numpy as np
 import cv2
 import time
+from logger import *
 
 # limit of maximum shift between two faces
 SHIFT_THRESHOLD = 5
