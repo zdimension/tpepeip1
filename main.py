@@ -12,6 +12,15 @@ import itertools
 import cv2
 from processor import *
 from logger import *
+from sys import exit
+from helper import *
+
+SIZE_NORMAL = 1.0
+SIZE_SMALL = 0.75
+SIZE_BIG = 1.25
+
+FONT_SERIF = cv2.FONT_HERSHEY_COMPLEX
+FONT_SERIF_SMALL = cv2.FONT_HERSHEY_COMPLEX_SMALL
 
 class TheApp():
     def __init__(self, cmdargs):  
@@ -52,17 +61,35 @@ class TheApp():
         }
         self.key = '\0'
         self.w, self.h, self.channels = 0, 0, 3
-        
+        self.infos = True
         self.proc = ImageProcessor(cmdargs.classifier)
-        
+        self.font_size = 1
+        self.text_color = WHITE
+
+    def text(self, text, x, y, col=None, size=SIZE_NORMAL, font=FONT_SERIF):
+        """wrapper for opencv"""
+        for ox, oy in itertools.product([-1, 1], repeat=2):
+            cv2.putText(self.proc.output, text, (x + ox, y + oy), font, self.font_size * size, BLACK, thickness=2)
+        cv2.putText(self.proc.output, text, (x, y), font, self.font_size * size, col or self.text_color, thickness=1)
+
+    def print(self, text):
+        self.text(text, 20, 30 + self.text_row * 30, font=FONT_SERIF_SMALL)
+        self.text_row += 1
+
     def app_loop(self):
         frame = self.camera.frame()
-
+        self.text_row = 0
         self.h, self.w, self.channels = frame.shape
         cv2.imshow("original", frame)
         
         self.proc.input = frame
-        self.proc.execute()
+        self.proc.execute(self.text)
+
+        self.print("l = lock face")
+        if self.cam_type == "usb":
+            self.print("c = next camera (if usb)")
+        self.print("s = show infos (fps, ...)")
+        self.print("esc = exit")
         
         cv2.imshow("processed", self.proc.output)
         
@@ -100,7 +127,7 @@ class TheApp():
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description="TPE")
     argparser.add_argument("type", type=str, help="camera type", choices=["usb", "net"], default="net")
-    argparser.add_argument("-u", "--url", type=str, help="url address", default="http://192.168.42.129:8080/video")
+    argparser.add_argument("-u", "--url", type=str, help="url address", default="http://192.168.0.48:8080/video")
     argparser.add_argument("-c", "--camera", type=int, help="id of usb camera", default=0)
     argparser.add_argument("--classifier", type=str, help="cascade classifier file (xml)", default="haarcascade_frontalface_alt.xml")
     
