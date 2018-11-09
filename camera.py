@@ -13,7 +13,7 @@ from logger import *
 class Camera():
     def __init__(self, path=0):
         self.path = path
-        self.camera = cv2.VideoCapture(-1)
+        self.camera = cv2.VideoCapture(path)
         
         try:
             info(f"Trying to connect to camera {self.path}")
