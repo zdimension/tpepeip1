@@ -13,12 +13,15 @@ from helper import *
 
 # limit of maximum shift between two faces
 SHIFT_THRESHOLD = 5
+MIN_SAMPLE_COUNT = 15
+FPS_SMOOTHING = 0.8
 
 class ImageProcessor():
     def __init__(self, cascade):
+        self.last_fps = 0
         self.fps = 0
-        self.buf_size =512
-        self.buffer = []
+        self.buf_size =256
+        self.avg_colors_buf = []
         
         self.lock_face = False
         
@@ -28,12 +31,18 @@ class ImageProcessor():
         self.classifier = cv2.CascadeClassifier(cascade)
         self.trained = False
         
-        self.times = []
+        self.times_buf = []
         self.start_time = time.time()
         
         self.face = [0, 0, 1, 1]
         
         self.last_centre = np.array([0, 0])
+
+        self.frequencies = []
+        self.fourier = []
+        self.bpm = 0
+        self.gap = 0
+
         
     def train_toggle(self):
         """sets if trained"""
@@ -61,6 +70,13 @@ class ImageProcessor():
         
         return decal
 
+    def calc_mean_color(self, rect):
+        """calculate mean color in sub rectangle"""
+        x,y ,w, h = rect
+        slice = self.input[y:y + h, x:x + w, :]
+        weights = [1, 2.5, 1]
+        return sum(weight * np.mean(slice[:, :, c]) for c, weight in enumerate(weights)) / sum(weights)
+
     def get_slice(self, rx, ry, rw, rh):
         """get part of rect (values between 0 and 1)"""
         x, y, w, h = self.face
@@ -81,16 +97,15 @@ class ImageProcessor():
         """process the image"""
         self.output = self.input
         
-        self.times.append(time.time() - self.start_time)
+        self.times_buf.append(time.time() - self.start_time)
         
         # n&b pour la détection de visage
         self.input_g = cv2.equalizeHist(cv2.cvtColor(self.input, cv2.COLOR_BGR2GRAY))
         
         if not self.lock_face:
             # reherche
-            self.times = []
-            self.buffer = []
-            
+            self.times_buf = []
+            self.avg_colors_buf = []
             self.trained = False
             
             detect = list(self.classifier.detectMultiScale(self.input_g, minNeighbors=4, minSize=(50, 50), flags=cv2.CASCADE_SCALE_IMAGE))
@@ -102,7 +117,7 @@ class ImageProcessor():
                 if self.calc_shift(biggest) > SHIFT_THRESHOLD:
                     self.face = biggest
 
-        forehead = self.get_slice(0.5, 0.2, 0.25, 0.15)
+        forehead = self.get_slice(0.5, 0.15, 0.35, 0.18)
 
         self.rect(*self.face, BLUE)
         self.rect(*forehead, GREEN)
@@ -110,6 +125,41 @@ class ImageProcessor():
         text("Face", *self.face[:2], BLUE)
         text("Forehead", *forehead[:2], GREEN)
 
+        if not self.lock_face:
+            return
 
+        fh_average = self.calc_mean_color(forehead)
+        self.avg_colors_buf.append(fh_average)
 
-        
+        self.avg_colors_buf = self.avg_colors_buf[-self.buf_size:]
+        self.times_buf = self.times_buf[-self.buf_size:]
+
+        num_samples = len(self.times_buf)
+
+        if num_samples > MIN_SAMPLE_COUNT:
+            time_start, time_end = self.times_buf[0], self.times_buf[-1]
+            num_samples = len(self.times_buf)
+            self.last_fps = self.fps
+            dt = time_end - time_start
+            if dt:
+                fps = num_samples / dt
+                self.fps = fps * FPS_SMOOTHING + self.last_fps * (1 - FPS_SMOOTHING)
+            avg_colors = np.array(self.avg_colors_buf)
+            linear = np.linspace(time_start, time_end, num_samples)
+            interp = np.hamming(num_samples) - np.interp(linear, self.times_buf, avg_colors)
+            deviation = interp - np.mean(interp)
+            fourier = np.fft.rfft(deviation)
+            arg = np.angle(fourier)
+            self.fourier = np.abs(fourier)
+            self.frequencies = self.fps / num_samples * np.arange(num_samples / 2 + 1)
+            fix_freqs = self.frequencies * 60.
+            pos = np.where((fix_freqs > BPM_LOW) & (fix_freqs < BPM_HIGH))
+            try:
+                filtered = self.fourier[pos]
+                self.frequencies = fix_freqs[pos]
+                self.fourier = filtered
+                self.bpmpos = np.argmax(filtered)
+                self.bpm = self.frequencies[self.bpmpos]
+            except:
+                pass
+            self.gap = (self.buf_size - num_samples) / self.fps

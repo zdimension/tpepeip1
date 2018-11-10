@@ -57,7 +57,9 @@ class TheApp():
         self.keys = {
             "c": self.next_camera,
             "s": self.show_infos,
-            "l": self.lock_toggle
+            "l": self.lock_toggle,
+            "+": self.zoom_plus,
+            "-": self.zoom_minus
         }
         self.key = '\0'
         self.w, self.h, self.channels = 0, 0, 3
@@ -65,12 +67,22 @@ class TheApp():
         self.proc = ImageProcessor(cmdargs.classifier)
         self.font_size = 1
         self.text_color = WHITE
+        self.zoom = 1
+        self.lastymax = 0
+
+    def zoom_plus(self):
+        self.zoom += 0.2
+
+    def zoom_minus(self):
+        self.zoom -= 0.2
+        if self.zoom < 1:
+            self.zoom = 1
 
     def text(self, text, x, y, col=None, size=SIZE_NORMAL, font=FONT_SERIF):
         """wrapper for opencv"""
         for ox, oy in itertools.product([-1, 1], repeat=2):
             cv2.putText(self.proc.output, text, (x + ox, y + oy), font, self.font_size * size, BLACK, thickness=2)
-        cv2.putText(self.proc.output, text, (x, y), font, self.font_size * size, col or self.text_color, thickness=1)
+        cv2.putText(self.proc.output, text, (x, y), font, self.font_size * size, col or self.text_color)
 
     def print(self, text):
         self.text(text, 20, 30 + self.text_row * 30, font=FONT_SERIF_SMALL)
@@ -78,8 +90,16 @@ class TheApp():
 
     def app_loop(self):
         frame = self.camera.frame()
-        self.text_row = 0
         self.h, self.w, self.channels = frame.shape
+        cx, cy = int(self.w / 2), int(self.h / 2)
+        rx, ry = int(self.w / self.zoom / 2), int(self.h / self.zoom / 2)
+        minx, maxx = cx - rx, cx + rx
+        miny, maxy = cy - ry, cy + ry
+        cropped = frame[miny:maxy, minx:maxx]
+        frame = cv2.resize(cropped, (self.w, self.h))
+
+        self.text_row = 0
+
         cv2.imshow("original", frame)
         
         self.proc.input = frame
@@ -89,14 +109,64 @@ class TheApp():
         if self.cam_type == "usb":
             self.print("c = next camera (if usb)")
         self.print("s = show infos (fps, ...)")
+        self.print("+ - = change zoom")
         self.print("esc = exit")
+
+        if self.infos:
+            self.display_infos()
         
         cv2.imshow("processed", self.proc.output)
         
         self.handle_keystroke()
+
+
+    def display_infos(self):
+        self.print("%.0f fps" % self.proc.fps)
+        self.print("%.0f bpm" % self.proc.bpm)
+        if self.proc.gap:
+            self.print("wait %.0f secs until good-ish values" % self.proc.gap)
+        #plotXY([[self.proc.frequencies, self.proc.fourier]],size=(300, 600), name="data", labels=[True], showmax=["bpm"], label_ndigits=[0], showmax_digits=[1], skip=[3])
+        #return
+        ymax_smoothing = 0.5
+        h, w = 300, 600
+        graph_frame = np.zeros((h, w, 3))
+        if list(self.proc.frequencies):
+            xmin = BPM_LOW
+            xmax = BPM_HIGH
+            xs = xmax - xmin
+            xo = 20
+
+            ymin, ymax = min(self.proc.fourier), max(self.proc.fourier)
+            ymax = ymax_smoothing * ymax + self.lastymax * (1 - ymax_smoothing)
+            self.lastymax = ymax
+            ymin = 0
+            ys = ymax - ymin
+            yo = 20
+            margin = 20
+            use_w = w - 2 * xo
+            def fix_point(p):
+                x, y = p
+                x = xo + int(round((x - xmin) / xs * (w - 2 * xo)))
+                y = yo + int(round((1 - (y - ymin) / ys) * (h - 2 * yo - margin)))
+                return x, y
+
+            points = np.array(list(map(fix_point, (zip(self.proc.frequencies, self.proc.fourier)))), dtype=np.int32)
+            cv2.polylines(graph_frame, [points], False, WHITE)
+            cv2.line(graph_frame, fix_point((self.proc.bpm, ymin)), fix_point((self.proc.bpm, self.proc.fourier[self.proc.bpmpos])), RED)
+
+            #tuples = zip(points, points[1:])
+            #for (p1, p2) in tuples:
+            #    cv2.line(graph_frame, fix_point(p1), fix_point(p2), WHITE)
+            spac = use_w / 12
+            val_spac = xs / 12
+            for i in range(12):
+                cv2.putText(graph_frame, "%.0f" % (i * val_spac + xmin), (round(xo + i * spac), h - 30), cv2.FONT_HERSHEY_PLAIN, 1, WHITE)
+
+            cv2.putText(graph_frame, "%.0f" % self.proc.bpm, (round(fix_point((self.proc.bpm, 0))[0]), h - 10), cv2.FONT_HERSHEY_PLAIN, 1.5, RED)
+        cv2.imshow("graph", graph_frame)
         
     def lock_toggle(self):     
-        info("Face lock " + "enabled" if self.proc.lock_toggle() else "diasbled")
+        info("Face lock " + ("enabled" if self.proc.lock_toggle() else "diasbled"))
         
     def handle_keystroke(self):
         self.key = cv2.waitKey(50) & 0xFF
@@ -121,13 +191,13 @@ class TheApp():
     
     def show_infos(self):
         self.infos = not self.infos
-        info("Infos " + "enabled" if self.infos else "disabled")
+        info("Infos " + ("enabled" if self.infos else "disabled"))
             
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description="TPE")
     argparser.add_argument("type", type=str, help="camera type", choices=["usb", "net"], default="net")
-    argparser.add_argument("-u", "--url", type=str, help="url address", default="http://192.168.0.48:8080/video")
+    argparser.add_argument("-u", "--url", type=str, help="url address or file path", default="http://192.168.0.48:8080/video")
     argparser.add_argument("-c", "--camera", type=int, help="id of usb camera", default=0)
     argparser.add_argument("--classifier", type=str, help="cascade classifier file (xml)", default="haarcascade_frontalface_alt.xml")
     
