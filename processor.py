@@ -42,6 +42,7 @@ class ImageProcessor():
         self.fourier = []
         self.bpm = 0
         self.gap = 0
+        self.buf_state = 0
 
         
     def train_toggle(self):
@@ -92,10 +93,17 @@ class ImageProcessor():
             fix_w,
             fix_h
         ]))
+
+    def resize_bufs(self):
+        self.avg_colors_buf = self.avg_colors_buf[-self.buf_size:]
+        self.times_buf = self.times_buf[-self.buf_size:]
     
     def execute(self, text):
         """process the image"""
         self.output = self.input
+
+        self.buf_state += 1
+        self.buf_state %= self.buf_size
         
         self.times_buf.append(time.time() - self.start_time)
         
@@ -104,8 +112,6 @@ class ImageProcessor():
         
         if not self.lock_face:
             # reherche
-            self.times_buf = []
-            self.avg_colors_buf = []
             self.trained = False
             
             detect = list(self.classifier.detectMultiScale(self.input_g, minNeighbors=4, minSize=(50, 50), flags=cv2.CASCADE_SCALE_IMAGE))
@@ -117,6 +123,11 @@ class ImageProcessor():
                 if self.calc_shift(biggest) > SHIFT_THRESHOLD:
                     self.face = biggest
 
+        if set(self.face) == {0, 1}:
+            self.avg_colors_buf.append(0)
+            self.resize_bufs()
+            return
+
         forehead = self.get_slice(0.5, 0.15, 0.35, 0.18)
 
         self.rect(*self.face, BLUE)
@@ -125,14 +136,10 @@ class ImageProcessor():
         text("Face", *self.face[:2], BLUE)
         text("Forehead", *forehead[:2], GREEN)
 
-        if not self.lock_face:
-            return
-
         fh_average = self.calc_mean_color(forehead)
         self.avg_colors_buf.append(fh_average)
 
-        self.avg_colors_buf = self.avg_colors_buf[-self.buf_size:]
-        self.times_buf = self.times_buf[-self.buf_size:]
+        self.resize_bufs()
 
         num_samples = len(self.times_buf)
 
@@ -149,7 +156,6 @@ class ImageProcessor():
             interp = np.hamming(num_samples) - np.interp(linear, self.times_buf, avg_colors)
             deviation = interp - np.mean(interp)
             fourier = np.fft.rfft(deviation)
-            arg = np.angle(fourier)
             self.fourier = np.abs(fourier)
             self.frequencies = self.fps / num_samples * np.arange(num_samples / 2 + 1)
             fix_freqs = self.frequencies * 60.

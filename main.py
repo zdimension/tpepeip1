@@ -163,6 +163,8 @@ class TheApp():
                 cv2.putText(graph_frame, "%.0f" % (i * val_spac + xmin), (round(xo + i * spac), h - 30), cv2.FONT_HERSHEY_PLAIN, 1, WHITE)
 
             cv2.putText(graph_frame, "%.0f" % self.proc.bpm, (round(fix_point((self.proc.bpm, 0))[0]), h - 10), cv2.FONT_HERSHEY_PLAIN, 1.5, RED)
+
+        cv2.line(graph_frame, (0, h), (int(round(self.proc.buf_state / self.proc.buf_size * w)), h), GREEN, 5)
         cv2.imshow("graph", graph_frame)
         
     def lock_toggle(self):     
