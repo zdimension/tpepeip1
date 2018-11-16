@@ -54,13 +54,7 @@ class TheApp():
             error(f"Invalid camera type: {self.cam_type}")
             exit()
             
-        self.keys = {
-            "c": self.next_camera,
-            "s": self.show_infos,
-            "l": self.lock_toggle,
-            "+": self.zoom_plus,
-            "-": self.zoom_minus
-        }
+        
         self.key = '\0'
         self.w, self.h, self.channels = 0, 0, 3
         self.infos = True
@@ -69,6 +63,14 @@ class TheApp():
         self.text_color = WHITE
         self.zoom = 1
         self.lastymax = 0
+        self.keys = {
+            "c": self.next_camera,
+            "s": self.show_infos,
+            "l": self.lock_toggle,
+            "+": self.zoom_plus,
+            "-": self.zoom_minus,
+            "x": self.proc.clear_bufs
+        }
 
     def zoom_plus(self):
         self.zoom += 0.2
@@ -123,6 +125,8 @@ class TheApp():
     def display_infos(self):
         self.print("%.0f fps" % self.proc.fps)
         self.print("%.0f bpm" % self.proc.bpm)
+        self.print("%.0f bpm (corrected)" % self.proc.cor_bpm)
+        self.print("d = %.3f" % self.proc.deviation[-1])
         if self.proc.gap:
             self.print("wait %.0f secs until good-ish values" % self.proc.gap)
         #plotXY([[self.proc.frequencies, self.proc.fourier]],size=(300, 600), name="data", labels=[True], showmax=["bpm"], label_ndigits=[0], showmax_digits=[1], skip=[3])

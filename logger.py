@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+# helper functions
+
 def wrap(text, *args):
     print("[%5s] " % text, end="")
     print(*args)
