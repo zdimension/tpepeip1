@@ -32,7 +32,7 @@ class TheApp():
             self.usb_id = cmdargs.camera
         
             for i in itertools.count():
-                if i > 0:
+                if i > cmdargs.hacky:
                     break # TODO: HACK: UGLY HACK because it crashes if you try to access an invalid ID :(
 
                 cam = Camera(i)
@@ -101,8 +101,6 @@ class TheApp():
         frame = cv2.resize(cropped, (self.w, self.h))
 
         self.text_row = 0
-
-        cv2.imshow("original", frame)
         
         self.proc.input = frame
         self.proc.execute(self.text)
@@ -205,7 +203,9 @@ if __name__ == "__main__":
     argparser.add_argument("type", type=str, help="camera type", choices=["usb", "net"], default="net")
     argparser.add_argument("-u", "--url", type=str, help="url address or file path", default="http://192.168.0.48:8080/video")
     argparser.add_argument("-c", "--camera", type=int, help="id of usb camera", default=0)
+
     argparser.add_argument("--classifier", type=str, help="cascade classifier file (xml)", default="haarcascade_frontalface_alt.xml")
+    argparser.add_argument("-hh", "--hacky", type=int, help="max id to scan (hack)", default=0)
     
     app = TheApp(argparser.parse_args())
     
