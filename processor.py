@@ -32,6 +32,10 @@ class ImageProcessor():
         
         self.input = np.zeros((10, 10))
         self.output = np.zeros((10, 10))
+
+        self.input_buf = []
+        self.input_buf_size = 5
+        self.denoise = False
         
         self.classifier = cv2.CascadeClassifier(cascade)
         
@@ -51,7 +55,9 @@ class ImageProcessor():
         
         self.bpm_buf = [60]
         self.cor_bpm = 0
-        self.bpmpos = 0        
+        self.bpmpos = 0
+
+        self.highbpm = False
         
     def clear_bufs(self):
         """clear the storage buffers"""
@@ -74,6 +80,18 @@ class ImageProcessor():
         self.lock_face = not self.lock_face
         
         return self.lock_face
+
+    def denoise_toggle(self):
+        """denoise image"""
+        self.denoise = not self.denoise
+
+        return self.denoise
+
+    def highbpm_toggle(self):
+        """high bpm (noise) filtering"""
+        self.highbpm = not self.highbpm
+
+        return self.highbpm
     
     def calc_shift(self, face):
         """calculates shift between current face and last detected to see if it's the same one"""
@@ -95,6 +113,18 @@ class ImageProcessor():
         x,y ,w, h = rect
         
         slice = self.input[y:y + h, x:x + w, :]
+        self.input_buf.append(slice)
+        self.resize_bufs()
+
+        if self.denoise and len(self.input_buf) == self.input_buf_size:
+            slice = cv2.fastNlMeansDenoisingColoredMulti(self.input_buf,
+                                                         self.input_buf_size // 2,
+                                                         self.input_buf_size,
+                                                         None,
+                                                         3,
+                                                         3,
+                                                         7,
+                                                         35)
         
         # we like the green channel more
         weights = [1.35, 2.6, 1]
@@ -124,10 +154,16 @@ class ImageProcessor():
         self.avg_colors_buf = self.avg_colors_buf[-self.buf_size:]
         self.times_buf = self.times_buf[-self.buf_size:]
         self.bpm_buf = self.bpm_buf[-self.buf_size:]
+        self.input_buf = self.input_buf[-self.input_buf_size:]
+        if self.input_buf:
+            self.input_buf = [x for x in self.input_buf if x.shape == self.input_buf[-1].shape]
     
     def execute(self, text):
         """process the image"""
         self.output = self.input
+
+        self.input_buf.append(self.input)
+        self.resize_bufs()
 
         # fancy progress indicator
         self.buf_state += 1
@@ -150,6 +186,7 @@ class ImageProcessor():
                 # otherwise, consider it's still the same face, but only moved
                 if self.calc_shift(biggest) > SHIFT_THRESHOLD:
                     self.face = biggest
+                    self.input_buf.clear()
 
         # if face is still default then set average to zero so shit doesnt hit the ceiling
         if set(self.face) == {0, 1}:
@@ -212,11 +249,19 @@ class ImageProcessor():
                 # filter out the values
                 self.frequencies = self.frequencies[pos]
                 self.fourier = self.fourier[pos]
+
+                if self.highbpm:
+                    fpos = np.where(self.frequencies < BPM_NOISE_HIGH)
+                    frequencies = self.frequencies[fpos]
+                    fourier = self.fourier[fpos]
+                else:
+                    frequencies = self.frequencies
+                    fourier = self.fourier
                 
                 # find index of freq with the biggest intensity
                 # it'll be the bpm
-                self.bpmpos = np.argmax(self.fourier)
-                self.bpm = self.frequencies[self.bpmpos]
+                self.bpmpos = np.argmax(fourier)
+                self.bpm = frequencies[self.bpmpos]
                 
                 # store it
                 self.bpm_buf.append(self.bpm)

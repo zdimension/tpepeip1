@@ -67,9 +67,11 @@ class TheApp():
             "c": self.next_camera,
             "s": self.show_infos,
             "l": self.lock_toggle,
+            "d": self.denoise_toggle,
             "+": self.zoom_plus,
             "-": self.zoom_minus,
-            "x": self.proc.clear_bufs
+            "x": self.proc.clear_bufs,
+            "h": self.highbpm_toggle
         }
 
     def zoom_plus(self):
@@ -109,6 +111,7 @@ class TheApp():
         if self.cam_type == "usb":
             self.print("c = next camera (if usb)")
         self.print("s = show infos (fps, ...)")
+        self.print("d = toggle de-noise")
         self.print("+ - = change zoom")
         self.print("esc = exit")
 
@@ -153,8 +156,13 @@ class TheApp():
                 return x, y
 
             points = np.array(list(map(fix_point, (zip(self.proc.frequencies, self.proc.fourier)))), dtype=np.int32)
-            cv2.polylines(graph_frame, [points], False, WHITE)
+            cv2.polylines(graph_frame, [points], False, WHITE, lineType=cv2.LINE_AA)
             cv2.line(graph_frame, fix_point((self.proc.bpm, ymin)), fix_point((self.proc.bpm, self.proc.fourier[self.proc.bpmpos])), RED)
+
+            if self.proc.highbpm:
+                bx = round(fix_point((BPM_NOISE_HIGH, 0))[0])
+                cv2.line(graph_frame, (bx, ymin), (bx, h), RED, 3)
+
 
             #tuples = zip(points, points[1:])
             #for (p1, p2) in tuples:
@@ -171,6 +179,14 @@ class TheApp():
         
     def lock_toggle(self):     
         info("Face lock " + ("enabled" if self.proc.lock_toggle() else "diasbled"))
+        if self.proc.lock_face:
+            self.proc.clear_bufs()
+
+    def denoise_toggle(self):
+        info("De-noise filter " + ("enabled" if self.proc.denoise_toggle() else "disabled"))
+
+    def highbpm_toggle(self):
+        info("High BPM (noise) filter " + ("enabled" if self.proc.highbpm_toggle() else "disabled"))
         
     def handle_keystroke(self):
         self.key = cv2.waitKey(50) & 0xFF

@@ -12,3 +12,4 @@ BLACK = (0, 0, 0)
 # bounds for a "normal" bpm
 BPM_LOW = 60
 BPM_HIGH = 180
+BPM_NOISE_HIGH = 120
