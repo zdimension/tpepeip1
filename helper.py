@@ -13,3 +13,6 @@ BLACK = (0, 0, 0)
 BPM_LOW = 60
 BPM_HIGH = 180
 BPM_NOISE_HIGH = 120
+
+def get_frame(w, h):
+    return np.zeros((h, w, 3))

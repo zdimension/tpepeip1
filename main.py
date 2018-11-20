@@ -17,7 +17,7 @@ from helper import *
 
 SIZE_NORMAL = 1.0
 SIZE_SMALL = 0.75
-SIZE_BIG = 1.25
+SIZE_BIG = 1.5
 
 FONT_SERIF = cv2.FONT_HERSHEY_COMPLEX
 FONT_SERIF_SMALL = cv2.FONT_HERSHEY_COMPLEX_SMALL
@@ -82,14 +82,16 @@ class TheApp():
         if self.zoom < 1:
             self.zoom = 1
 
-    def text(self, text, x, y, col=None, size=SIZE_NORMAL, font=FONT_SERIF):
+    def text(self, text, x, y, col=None, size=SIZE_NORMAL, font=FONT_SERIF, frame=None):
         """wrapper for opencv"""
+        if frame is None:
+            frame = self.proc.output
         for ox, oy in itertools.product([-1, 1], repeat=2):
-            cv2.putText(self.proc.output, text, (x + ox, y + oy), font, self.font_size * size, BLACK, thickness=2)
-        cv2.putText(self.proc.output, text, (x, y), font, self.font_size * size, col or self.text_color)
+            cv2.putText(frame, text, (x + ox, y + oy), font, self.font_size * size, BLACK, 2, cv2.LINE_AA)
+        cv2.putText(frame, text, (x, y), font, self.font_size * size, col or self.text_color, lineType=cv2.LINE_AA)
 
-    def print(self, text):
-        self.text(text, 20, 30 + self.text_row * 30, font=FONT_SERIF_SMALL)
+    def print(self, text, frame=None, col=None):
+        self.text(text, 20, int(30 + self.text_row * 30), font=FONT_SERIF_SMALL, frame=frame, col=col)
         self.text_row += 1
 
     def app_loop(self):
@@ -107,13 +109,30 @@ class TheApp():
         self.proc.input = frame
         self.proc.execute(self.text)
 
-        self.print("l = lock face")
-        if self.cam_type == "usb":
-            self.print("c = next camera (if usb)")
-        self.print("s = show infos (fps, ...)")
-        self.print("d = toggle de-noise")
-        self.print("+ - = change zoom")
-        self.print("esc = exit")
+        lines = [
+            ("l = lock face", self.proc.lock_face),
+            "c = next camera (if usb)" if self.cam_type == "usb" else None,
+            ("s = show infos (fps, ...)", self.infos),
+            ("d = toggle de-noise", self.proc.denoise),
+            ("h = toggle noisy high-bpm filter", self.proc.highbpm),
+            "+ - = change zoom",
+            "esc = exit"
+        ]
+
+        keys_frame = get_frame(400, 30 + len(lines) * 30)
+
+        for l in lines:
+            if l is not None:
+                if type(l) != str:
+                    l, ok = l
+                    col = GREEN if ok else RED
+                else:
+                    col = WHITE
+                self.print(l, col=col, frame=keys_frame)
+
+        cv2.imshow("infos", keys_frame)
+
+        self.text_row = 0
 
         if self.infos:
             self.display_infos()
@@ -124,17 +143,18 @@ class TheApp():
 
 
     def display_infos(self):
+        self.text("%.0f bpm" % self.proc.cor_bpm, 15, 50, size=SIZE_BIG)
+        self.text_row += SIZE_BIG / SIZE_SMALL
+        self.print("%.0f bpm (raw)" % self.proc.bpm)
         self.print("%.0f fps" % self.proc.fps)
-        self.print("%.0f bpm" % self.proc.bpm)
-        self.print("%.0f bpm (corrected)" % self.proc.cor_bpm)
         self.print("d = %.3f" % self.proc.deviation[-1])
         if self.proc.gap:
-            self.print("wait %.0f secs until good-ish values" % self.proc.gap)
+            self.print("wait %.0fs" % self.proc.gap)
         #plotXY([[self.proc.frequencies, self.proc.fourier]],size=(300, 600), name="data", labels=[True], showmax=["bpm"], label_ndigits=[0], showmax_digits=[1], skip=[3])
         #return
         ymax_smoothing = 0.5
         h, w = 300, 600
-        graph_frame = np.zeros((h, w, 3))
+        graph_frame = get_frame(w, h)
         if list(self.proc.frequencies):
             xmin = BPM_LOW
             xmax = BPM_HIGH
@@ -170,9 +190,9 @@ class TheApp():
             spac = use_w / 12
             val_spac = xs / 12
             for i in range(12):
-                cv2.putText(graph_frame, "%.0f" % (i * val_spac + xmin), (round(xo + i * spac), h - 30), cv2.FONT_HERSHEY_PLAIN, 1, WHITE)
+                cv2.putText(graph_frame, "%.0f" % (i * val_spac + xmin), (round(xo + i * spac), h - 30), cv2.FONT_HERSHEY_PLAIN, 1, WHITE, lineType=cv2.LINE_AA)
 
-            cv2.putText(graph_frame, "%.0f" % self.proc.bpm, (round(fix_point((self.proc.bpm, 0))[0]), h - 10), cv2.FONT_HERSHEY_PLAIN, 1.5, RED)
+            cv2.putText(graph_frame, "%.0f" % self.proc.bpm, (round(fix_point((self.proc.bpm, 0))[0]), h - 10), cv2.FONT_HERSHEY_PLAIN, 1.5, RED, lineType=cv2.LINE_AA)
 
         cv2.line(graph_frame, (0, h), (int(round(self.proc.buf_state / self.proc.buf_size * w)), h), GREEN, 5)
         cv2.imshow("graph", graph_frame)
