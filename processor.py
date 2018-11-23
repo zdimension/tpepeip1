@@ -57,7 +57,7 @@ class ImageProcessor():
         self.cor_bpm = 0
         self.bpmpos = 0
 
-        self.highbpm = False
+        self.highbpm = True
         
     def clear_bufs(self):
         """clear the storage buffers"""

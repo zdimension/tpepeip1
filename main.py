@@ -119,7 +119,7 @@ class TheApp():
             "esc = exit"
         ]
 
-        keys_frame = get_frame(400, 30 + len(lines) * 30)
+        keys_frame = get_frame(500, 30 + len(lines) * 30)
 
         for l in lines:
             if l is not None:
@@ -176,7 +176,13 @@ class TheApp():
                 return x, y
 
             points = np.array(list(map(fix_point, (zip(self.proc.frequencies, self.proc.fourier)))), dtype=np.int32)
+
+            #tuples = zip(points, points[1:])
+            #for (p1, p2) in tuples:
+            #    cv2.line(graph_frame, fix_point(p1), fix_point(p2), WHITE, lineType=cv2.LINE_AA)
+
             cv2.polylines(graph_frame, [points], False, WHITE, lineType=cv2.LINE_AA)
+
             cv2.line(graph_frame, fix_point((self.proc.bpm, ymin)), fix_point((self.proc.bpm, self.proc.fourier[self.proc.bpmpos])), RED)
 
             if self.proc.highbpm:
@@ -184,9 +190,8 @@ class TheApp():
                 cv2.line(graph_frame, (bx, ymin), (bx, h), RED, 3)
 
 
-            #tuples = zip(points, points[1:])
-            #for (p1, p2) in tuples:
-            #    cv2.line(graph_frame, fix_point(p1), fix_point(p2), WHITE)
+
+
             spac = use_w / 12
             val_spac = xs / 12
             for i in range(12):
