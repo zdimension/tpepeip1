@@ -36,6 +36,8 @@ class ImageProcessor():
         self.input_buf = []
         self.input_buf_size = 5
         self.denoise = False
+
+        self.colorify = False
         
         self.classifier = cv2.CascadeClassifier(cascade)
         
@@ -92,6 +94,12 @@ class ImageProcessor():
         self.highbpm = not self.highbpm
 
         return self.highbpm
+
+    def colorify_toggle(self):
+        """enhanced color variation displaying"""
+        self.colorify = not self.colorify
+
+        return self.colorify
     
     def calc_shift(self, face):
         """calculates shift between current face and last detected to see if it's the same one"""
@@ -108,11 +116,16 @@ class ImageProcessor():
         coeffs = [sqrt((x + len(arr) / 100) / (len(arr) + len(arr) / 100)) for x in range(1, len(arr) + 1)]
         return np.average(arr, weights=coeffs)
 
+    def get_subpicture(self, rect):
+        """get "slice" of picture"""
+        x, y, w, h = rect
+
+        return self.input[y:y + h, x:x + w, :]
+
     def calc_mean_color(self, rect):
         """calculate mean color in sub rectangle"""
-        x,y ,w, h = rect
-        
-        slice = self.input[y:y + h, x:x + w, :]
+
+        slice = self.get_subpicture(rect)
         self.input_buf.append(slice)
         self.resize_bufs()
 
@@ -148,6 +161,10 @@ class ImageProcessor():
             fix_w,
             fix_h
         ]))
+
+    def draw_at(self, img, rect):
+        """draw the image at the specified position"""
+        self.output[rect[1]:rect[1]+rect[3], rect[0]:rect[0]+rect[2]] = img
 
     def resize_bufs(self):
         """resize the storage buffers so they don't go above the buffer size"""
@@ -195,7 +212,7 @@ class ImageProcessor():
             return
 
         # good-ish numbers, after trial and error
-        forehead = self.get_slice(0.5, 0.16, 0.38, 0.13)
+        forehead = self.get_slice(0.5, 0.15, 0.38, 0.14)
 
         # draw rects around face and forehead
         self.rect(*self.face, BLUE)
@@ -203,6 +220,16 @@ class ImageProcessor():
 
         text("Face", *self.face[:2], BLUE)
         text("Forehead", *forehead[:2], GREEN)
+
+        if self.colorify:
+            new_forehead = self.get_subpicture(forehead)
+            left = 100
+            total_width = 256
+            curve_width = total_width - 2 * left
+            alpha = total_width  / curve_width
+            beta = -left * alpha
+            new_forehead = cv2.convertScaleAbs(new_forehead, None, alpha, beta)
+            self.draw_at(new_forehead, forehead)
 
         # take average color of forehead region
         fh_average = self.calc_mean_color(forehead)

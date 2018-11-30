@@ -62,7 +62,7 @@ class TheApp():
         self.font_size = 1
         self.text_color = WHITE
         self.zoom = 1
-        self.lastymax = 0
+        self.last_y_max = 0
         self.keys = {
             "c": self.next_camera,
             "s": self.show_infos,
@@ -71,7 +71,8 @@ class TheApp():
             "+": self.zoom_plus,
             "-": self.zoom_minus,
             "x": self.proc.clear_bufs,
-            "h": self.highbpm_toggle
+            "h": self.highbpm_toggle,
+            "i": self.colorify_toggle
         }
 
     def zoom_plus(self):
@@ -115,6 +116,7 @@ class TheApp():
             ("s = show infos (fps, ...)", self.infos),
             ("d = toggle de-noise", self.proc.denoise),
             ("h = toggle noisy high-bpm filter", self.proc.highbpm),
+            ("i = show enhanced color intensity", self.proc.colorify),
             "+ - = change zoom",
             "esc = exit"
         ]
@@ -152,27 +154,43 @@ class TheApp():
             self.print("wait %.0fs" % self.proc.gap)
         #plotXY([[self.proc.frequencies, self.proc.fourier]],size=(300, 600), name="data", labels=[True], showmax=["bpm"], label_ndigits=[0], showmax_digits=[1], skip=[3])
         #return
-        ymax_smoothing = 0.5
+        y_max_smoothing = 0.5
         h, w = 300, 600
         graph_frame = get_frame(w, h)
         if list(self.proc.frequencies):
-            xmin = BPM_LOW
-            xmax = BPM_HIGH
-            xs = xmax - xmin
-            xo = 20
+            x_min = BPM_LOW
+            x_max = BPM_HIGH
+            x_size = x_max - x_min
+            x_off = 20
 
-            ymin, ymax = min(self.proc.fourier), max(self.proc.fourier)
-            ymax = ymax_smoothing * ymax + self.lastymax * (1 - ymax_smoothing)
-            self.lastymax = ymax
-            ymin = 0
-            ys = ymax - ymin
-            yo = 20
-            margin = 20
-            use_w = w - 2 * xo
+            y_min, y_max = min(self.proc.fourier), max(self.proc.fourier)
+            y_max = y_max_smoothing * y_max + self.last_y_max * (1 - y_max_smoothing)
+            self.last_y_max = y_max
+            y_min = 0
+            y_size = y_max - y_min
+            y_off = 40
+            y_margin = 20
+
+            x_target = w - 2 * x_off
+            y_target = h - 2 * y_off - y_margin
+
             def fix_point(p):
                 x, y = p
-                x = xo + int(round((x - xmin) / xs * (w - 2 * xo)))
-                y = yo + int(round((1 - (y - ymin) / ys) * (h - 2 * yo - margin)))
+                # values starting at 0
+                x_0 = x - x_min
+                y_0 = y - y_min
+
+                # values normalized (between 0 and 1) ; invert Y orientation
+                x_n = x_0 / x_size
+                y_n = 1 - y_0 / y_size
+
+                # values fixed in their target size
+                x_f = x_n * x_target
+                y_f = y_n * y_target
+
+                # final values
+                x = x_off + int(round(x_f))
+                y = y_off + int(round(y_f))
                 return x, y
 
             points = np.array(list(map(fix_point, (zip(self.proc.frequencies, self.proc.fourier)))), dtype=np.int32)
@@ -183,19 +201,19 @@ class TheApp():
 
             cv2.polylines(graph_frame, [points], False, WHITE, lineType=cv2.LINE_AA)
 
-            cv2.line(graph_frame, fix_point((self.proc.bpm, ymin)), fix_point((self.proc.bpm, self.proc.fourier[self.proc.bpmpos])), RED)
+            cv2.line(graph_frame, fix_point((self.proc.bpm, y_min)), fix_point((self.proc.bpm, self.proc.fourier[self.proc.bpmpos])), RED)
 
             if self.proc.highbpm:
                 bx = round(fix_point((BPM_NOISE_HIGH, 0))[0])
-                cv2.line(graph_frame, (bx, ymin), (bx, h), RED, 3)
+                cv2.line(graph_frame, (bx, y_min), (bx, h), RED, 3)
 
 
 
 
-            spac = use_w / 12
-            val_spac = xs / 12
+            spac = x_target / 12
+            val_spac = x_size / 12
             for i in range(12):
-                cv2.putText(graph_frame, "%.0f" % (i * val_spac + xmin), (round(xo + i * spac), h - 30), cv2.FONT_HERSHEY_PLAIN, 1, WHITE, lineType=cv2.LINE_AA)
+                cv2.putText(graph_frame, "%.0f" % (i * val_spac + x_min), (round(x_off + i * spac), h - 30), cv2.FONT_HERSHEY_PLAIN, 1, WHITE, lineType=cv2.LINE_AA)
 
             cv2.putText(graph_frame, "%.0f" % self.proc.bpm, (round(fix_point((self.proc.bpm, 0))[0]), h - 10), cv2.FONT_HERSHEY_PLAIN, 1.5, RED, lineType=cv2.LINE_AA)
 
@@ -212,6 +230,9 @@ class TheApp():
 
     def highbpm_toggle(self):
         info("High BPM (noise) filter " + ("enabled" if self.proc.highbpm_toggle() else "disabled"))
+
+    def colorify_toggle(self):
+        info("Colorization " + ("enabled" if self.proc.colorify_toggle() else "disabled"))
         
     def handle_keystroke(self):
         self.key = cv2.waitKey(50) & 0xFF
