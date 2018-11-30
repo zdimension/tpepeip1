@@ -119,7 +119,7 @@ class TheApp():
             "esc = exit"
         ]
 
-        keys_frame = get_frame(500, 30 + len(lines) * 30)
+        keys_frame = get_frame(500, 20 + len(lines) * 30)
 
         for l in lines:
             if l is not None:
