@@ -138,7 +138,7 @@ class ImageProcessor():
         x, y, w, h = self.face
 
         fix_x = w * rx
-        fix_y = w * ry
+        fix_y = h * ry
         fix_w = w * rw
         fix_h = h * rh
 
