@@ -15,7 +15,6 @@ if __name__ == "__main__":
     argparser.add_argument("-u", "--url", type=str, help="url address or file path",
                            default="http://192.168.0.48:8080/video")
     argparser.add_argument("-c", "--camera", type=int, help="id of usb camera", default=0)
-
     argparser.add_argument("--classifier", type=str, help="cascade classifier file (xml)",
                            default="haarcascade_frontalface_alt.xml")
     argparser.add_argument("-hh", "--hacky", type=int, help="max id to scan (hack)", default=0)

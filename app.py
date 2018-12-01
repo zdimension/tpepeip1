@@ -2,7 +2,7 @@ import itertools
 from sys import exit
 
 import cv2
-import numpy
+import numpy as np
 
 from camera import Camera
 from helper import WHITE, BLACK, get_frame, GREEN, RED, BPM_LOW, BPM_HIGH, BPM_NOISE_HIGH
