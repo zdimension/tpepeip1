@@ -26,6 +26,7 @@ class TheApp():
     def __init__(self, cmdargs):  
         info("Starting app with args " + str(cmdargs))
         self.cam_type = cmdargs.type
+        self.rotate = cmdargs.rotate
         self.usb_cameras = []
         
         if self.cam_type == "usb":
@@ -97,6 +98,14 @@ class TheApp():
 
     def app_loop(self):
         frame = self.camera.frame()
+
+        if self.rotate == 90:
+            frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+        elif self.rotate == -90:
+            frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        elif self.rotate == 180:
+            frame = cv2.rotate(frame, cv2.ROTATE_180)
+
         self.h, self.w, self.channels = frame.shape
         cx, cy = int(self.w / 2), int(self.h / 2)
         rx, ry = int(self.w / self.zoom / 2), int(self.h / self.zoom / 2)
@@ -268,6 +277,7 @@ if __name__ == "__main__":
 
     argparser.add_argument("--classifier", type=str, help="cascade classifier file (xml)", default="haarcascade_frontalface_alt.xml")
     argparser.add_argument("-hh", "--hacky", type=int, help="max id to scan (hack)", default=0)
+    argparser.add_argument("-r", "--rotate", type=int, help="rotation to apply (either -90, 90 or 180)", choices=[-90, 90, 180], default=0)
     
     app = TheApp(argparser.parse_args())
     
