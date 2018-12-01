@@ -5,15 +5,14 @@ Created on Thu Nov  8 09:55:40 2018
 @author: nigett
 """
 
-from camera import *
-import numpy as np
 import argparse
 import itertools
-import cv2
-from processor import *
-from logger import *
 from sys import exit
+
+from camera import *
 from helper import *
+from logger import *
+from processor import *
 
 SIZE_NORMAL = 1.0
 SIZE_SMALL = 0.75
@@ -22,27 +21,28 @@ SIZE_BIG = 1.5
 FONT_SERIF = cv2.FONT_HERSHEY_COMPLEX
 FONT_SERIF_SMALL = cv2.FONT_HERSHEY_COMPLEX_SMALL
 
+
 class TheApp():
-    def __init__(self, cmdargs):  
+    def __init__(self, cmdargs):
         info("Starting app with args " + str(cmdargs))
         self.cam_type = cmdargs.type
         self.rotate = cmdargs.rotate
         self.usb_cameras = []
-        
+
         if self.cam_type == "usb":
             self.usb_id = cmdargs.camera
-        
+
             for i in itertools.count():
                 if i > cmdargs.hacky:
-                    break # TODO: HACK: UGLY HACK because it crashes if you try to access an invalid ID :(
+                    break  # TODO: HACK: UGLY HACK because it crashes if you try to access an invalid ID :(
 
                 cam = Camera(i)
-                
+
                 if not cam.connected:
                     break
-                
+
                 self.usb_cameras.append(cam)
-                
+
             if self.usb_id >= len(self.usb_cameras):
                 error(f"Invalid usb id: {self.usb_id}")
                 exit()
@@ -54,8 +54,7 @@ class TheApp():
         else:
             error(f"Invalid camera type: {self.cam_type}")
             exit()
-            
-        
+
         self.key = '\0'
         self.w, self.h, self.channels = 0, 0, 3
         self.infos = True
@@ -115,7 +114,7 @@ class TheApp():
         frame = cv2.resize(cropped, (self.w, self.h))
 
         self.text_row = 0
-        
+
         self.proc.input = frame
         self.proc.execute(self.text)
 
@@ -147,11 +146,10 @@ class TheApp():
 
         if self.infos:
             self.display_infos()
-        
-        cv2.imshow("processed", self.proc.output)
-        
-        self.handle_keystroke()
 
+        cv2.imshow("processed", self.proc.output)
+
+        self.handle_keystroke()
 
     def display_infos(self):
         self.text("%.0f bpm" % self.proc.cor_bpm, 15, 50, size=SIZE_BIG)
@@ -161,8 +159,8 @@ class TheApp():
         self.print("d = %.3f" % self.proc.deviation[-1])
         if self.proc.gap:
             self.print("wait %.0fs" % self.proc.gap)
-        #plotXY([[self.proc.frequencies, self.proc.fourier]],size=(300, 600), name="data", labels=[True], showmax=["bpm"], label_ndigits=[0], showmax_digits=[1], skip=[3])
-        #return
+        # plotXY([[self.proc.frequencies, self.proc.fourier]],size=(300, 600), name="data", labels=[True], showmax=["bpm"], label_ndigits=[0], showmax_digits=[1], skip=[3])
+        # return
         y_max_smoothing = 0.5
         h, w = 300, 600
         graph_frame = get_frame(w, h)
@@ -204,32 +202,32 @@ class TheApp():
 
             points = np.array(list(map(fix_point, (zip(self.proc.frequencies, self.proc.fourier)))), dtype=np.int32)
 
-            #tuples = zip(points, points[1:])
-            #for (p1, p2) in tuples:
+            # tuples = zip(points, points[1:])
+            # for (p1, p2) in tuples:
             #    cv2.line(graph_frame, fix_point(p1), fix_point(p2), WHITE, lineType=cv2.LINE_AA)
 
             cv2.polylines(graph_frame, [points], False, WHITE, lineType=cv2.LINE_AA)
 
-            cv2.line(graph_frame, fix_point((self.proc.bpm, y_min)), fix_point((self.proc.bpm, self.proc.fourier[self.proc.bpmpos])), RED)
+            cv2.line(graph_frame, fix_point((self.proc.bpm, y_min)),
+                     fix_point((self.proc.bpm, self.proc.fourier[self.proc.bpmpos])), RED)
 
             if self.proc.highbpm:
                 bx = round(fix_point((BPM_NOISE_HIGH, 0))[0])
                 cv2.line(graph_frame, (bx, y_min), (bx, h), RED, 3)
 
-
-
-
             spac = x_target / 12
             val_spac = x_size / 12
             for i in range(12):
-                cv2.putText(graph_frame, "%.0f" % (i * val_spac + x_min), (round(x_off + i * spac), h - 30), cv2.FONT_HERSHEY_PLAIN, 1, WHITE, lineType=cv2.LINE_AA)
+                cv2.putText(graph_frame, "%.0f" % (i * val_spac + x_min), (round(x_off + i * spac), h - 30),
+                            cv2.FONT_HERSHEY_PLAIN, 1, WHITE, lineType=cv2.LINE_AA)
 
-            cv2.putText(graph_frame, "%.0f" % self.proc.bpm, (round(fix_point((self.proc.bpm, 0))[0]), h - 10), cv2.FONT_HERSHEY_PLAIN, 1.5, RED, lineType=cv2.LINE_AA)
+            cv2.putText(graph_frame, "%.0f" % self.proc.bpm, (round(fix_point((self.proc.bpm, 0))[0]), h - 10),
+                        cv2.FONT_HERSHEY_PLAIN, 1.5, RED, lineType=cv2.LINE_AA)
 
         cv2.line(graph_frame, (0, h), (int(round(self.proc.buf_state / self.proc.buf_size * w)), h), GREEN, 5)
         cv2.imshow("graph", graph_frame)
-        
-    def lock_toggle(self):     
+
+    def lock_toggle(self):
         info("Face lock " + ("enabled" if self.proc.lock_toggle() else "diasbled"))
         if self.proc.lock_face:
             self.proc.clear_bufs()
@@ -242,45 +240,47 @@ class TheApp():
 
     def colorify_toggle(self):
         info("Colorization " + ("enabled" if self.proc.colorify_toggle() else "disabled"))
-        
+
     def handle_keystroke(self):
         self.key = cv2.waitKey(50) & 0xFF
-        
-        if self.key == 0x1B: # ascii ESC
+
+        if self.key == 0x1B:  # ascii ESC
             info("good bye")
-            
+
             for c in self.usb_cameras:
                 c.dispose()
-                
+
             exit()
-            
+
         for key, handler in self.keys.items():
             if self.key == ord(key):
                 handler()
-        
+
     def next_camera(self):
         if self.cam_type == "usb":
             self.usb_id = (self.usb_id + 1) % len(self.usb_cameras)
             self.camera = self.usb_cameras[self.usb_id]
             info(f"Switched to usb {self.usb_id}")
-    
+
     def show_infos(self):
         self.infos = not self.infos
         info("Infos " + ("enabled" if self.infos else "disabled"))
-            
+
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description="TPE")
     argparser.add_argument("type", type=str, help="camera type", choices=["usb", "net"], default="net")
-    argparser.add_argument("-u", "--url", type=str, help="url address or file path", default="http://192.168.0.48:8080/video")
+    argparser.add_argument("-u", "--url", type=str, help="url address or file path",
+                           default="http://192.168.0.48:8080/video")
     argparser.add_argument("-c", "--camera", type=int, help="id of usb camera", default=0)
 
-    argparser.add_argument("--classifier", type=str, help="cascade classifier file (xml)", default="haarcascade_frontalface_alt.xml")
+    argparser.add_argument("--classifier", type=str, help="cascade classifier file (xml)",
+                           default="haarcascade_frontalface_alt.xml")
     argparser.add_argument("-hh", "--hacky", type=int, help="max id to scan (hack)", default=0)
-    argparser.add_argument("-r", "--rotate", type=int, help="rotation to apply (either -90, 90 or 180)", choices=[-90, 90, 180], default=0)
-    
+    argparser.add_argument("-r", "--rotate", type=int, help="rotation to apply (either -90, 90 or 180)",
+                           choices=[-90, 90, 180], default=0)
+
     app = TheApp(argparser.parse_args())
-    
+
     while True:
         app.app_loop()
-    

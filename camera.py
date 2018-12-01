@@ -4,17 +4,17 @@ Created on Thu Nov  8 09:55:18 2018
 
 @author: nigett
 """
-import time
 
 import cv2
-import numpy as np
+
 from logger import *
+
 
 class Camera():
     def __init__(self, path=0):
         self.path = path
         self.camera = cv2.VideoCapture(path)
-        
+
         try:
             info(f"Trying to connect to camera {self.path}")
             status = self.camera.read()
@@ -25,10 +25,10 @@ class Camera():
             self.camera_shape = None
             self.connected = False
             error(f"Couldn't connect to camera {self.path}")
-            
+
     def dispose(self):
         self.camera.release()
-            
+
     def frame(self):
         if not self.connected:
             error(f"Trying to read frame from invalid camera {self.path}")
@@ -39,5 +39,3 @@ class Camera():
         except:
             error("An error occured while reading the frame")
             exit()
-    
-    

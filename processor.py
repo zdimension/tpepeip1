@@ -5,12 +5,12 @@ Created on Fri Nov  9 09:21:21 2018
 @author: nigett
 """
 
-import numpy as np
-import cv2
 import time
-from logger import *
-from helper import *
 from math import sqrt
+
+import cv2
+
+from helper import *
 
 # limit of maximum shift between two faces
 SHIFT_THRESHOLD = 5
@@ -21,15 +21,16 @@ MIN_SAMPLE_COUNT = 15
 # fps smoothing factor
 FPS_SMOOTHING = 0.8
 
+
 class ImageProcessor():
     def __init__(self, cascade):
         self.last_fps = 0
         self.fps = 0
-        self.buf_size =256
+        self.buf_size = 256
         self.avg_colors_buf = []
-        
+
         self.lock_face = False
-        
+
         self.input = np.zeros((10, 10))
         self.output = np.zeros((10, 10))
 
@@ -38,14 +39,14 @@ class ImageProcessor():
         self.denoise = False
 
         self.colorify = False
-        
+
         self.classifier = cv2.CascadeClassifier(cascade)
-        
+
         self.times_buf = []
         self.start_time = time.time()
-        
+
         self.face = [0, 0, 1, 1]
-        
+
         self.last_centre = np.array([0, 0])
 
         self.frequencies = []
@@ -54,33 +55,33 @@ class ImageProcessor():
         self.gap = 0
         self.buf_state = 0
         self.deviation = [0]
-        
+
         self.bpm_buf = [60]
         self.cor_bpm = 0
         self.bpmpos = 0
 
         self.highbpm = True
-        
+
     def clear_bufs(self):
         """clear the storage buffers"""
         self.avg_colors_buf = []
         self.times_buf = []
         self.bpm_buf = []
-        
+
     def train_toggle(self):
         """sets if trained"""
         self.trained = not self.trained
-        
+
         return self.trained
-    
+
     def rect(self, x, y, w, h, col=WHITE):
         """wrapper for opencv"""
         cv2.rectangle(self.output, (x, y), (x + w, y + h), col, 2)
-        
+
     def lock_toggle(self):
         """lock on face"""
         self.lock_face = not self.lock_face
-        
+
         return self.lock_face
 
     def denoise_toggle(self):
@@ -100,17 +101,17 @@ class ImageProcessor():
         self.colorify = not self.colorify
 
         return self.colorify
-    
+
     def calc_shift(self, face):
         """calculates shift between current face and last detected to see if it's the same one"""
-        x, y ,w, h = face
-        
+        x, y, w, h = face
+
         centre = np.array([x + w / 2, y + h / 2])
         decal = np.linalg.norm(centre - self.last_centre)
         self.last_centre = centre
-        
+
         return decal
-    
+
     def progressive_mean(self, arr):
         """take a "progressive" mean, i.e. values are more accounted for the more recent they are, on a sqrt scale"""
         coeffs = [sqrt((x + len(arr) / 100) / (len(arr) + len(arr) / 100)) for x in range(1, len(arr) + 1)]
@@ -138,10 +139,10 @@ class ImageProcessor():
                                                          3,
                                                          7,
                                                          35)
-        
+
         # we like the green channel more
         weights = [1.35, 2.6, 1]
-        
+
         return sum(weight * np.mean(slice[:, :, c]) for c, weight in enumerate(weights)) / sum(weights)
 
     def get_slice(self, rx, ry, rw, rh):
@@ -164,7 +165,7 @@ class ImageProcessor():
 
     def draw_at(self, img, rect):
         """draw the image at the specified position"""
-        self.output[rect[1]:rect[1]+rect[3], rect[0]:rect[0]+rect[2]] = img
+        self.output[rect[1]:rect[1] + rect[3], rect[0]:rect[0] + rect[2]] = img
 
     def resize_bufs(self):
         """resize the storage buffers so they don't go above the buffer size"""
@@ -174,7 +175,7 @@ class ImageProcessor():
         self.input_buf = self.input_buf[-self.input_buf_size:]
         if self.input_buf:
             self.input_buf = [x for x in self.input_buf if x.shape == self.input_buf[-1].shape]
-    
+
     def execute(self, text):
         """process the image"""
         self.output = self.input
@@ -185,19 +186,20 @@ class ImageProcessor():
         # fancy progress indicator
         self.buf_state += 1
         self.buf_state %= self.buf_size
-        
+
         self.times_buf.append(time.time() - self.start_time)
-        
-        if not self.lock_face:            
+
+        if not self.lock_face:
             # b&w for face detection classifier
             self.input_g = cv2.equalizeHist(cv2.cvtColor(self.input, cv2.COLOR_BGR2GRAY))
-            
-            detect = list(self.classifier.detectMultiScale(self.input_g, minNeighbors=4, minSize=(50, 50), flags=cv2.CASCADE_SCALE_IMAGE))
-            
+
+            detect = list(self.classifier.detectMultiScale(self.input_g, minNeighbors=4, minSize=(50, 50),
+                                                           flags=cv2.CASCADE_SCALE_IMAGE))
+
             if detect:
                 # take the biggest one (by size)
                 biggest = sorted(detect, reverse=True, key=lambda f: f[-1] * f[-2])[0]
- 
+
                 # if difference between detected and current one is bigger than threshold
                 # then set current one as detected
                 # otherwise, consider it's still the same face, but only moved
@@ -226,7 +228,7 @@ class ImageProcessor():
             left = 100
             total_width = 256
             curve_width = total_width - 2 * left
-            alpha = total_width  / curve_width
+            alpha = total_width / curve_width
             beta = -left * alpha
             new_forehead = cv2.convertScaleAbs(new_forehead, None, alpha, beta)
             self.draw_at(new_forehead, forehead)
@@ -243,35 +245,35 @@ class ImageProcessor():
             # bounds of time buffer
             time_start, time_end = self.times_buf[0], self.times_buf[-1]
             num_samples = len(self.times_buf)
-            
+
             # calculate fps with smoothing
             self.last_fps = self.fps
             dt = time_end - time_start
             if dt:
                 fps = num_samples / dt
                 self.fps = fps * FPS_SMOOTHING + self.last_fps * (1 - FPS_SMOOTHING)
-                
+
             # interpolate the color data on a linear time space
             linear = np.linspace(time_start, time_end, num_samples)
-            
+
             # filter out useless signals with hamming window
             window = np.hamming(num_samples)
-            
+
             # interpolate that bitch
             interp = window - np.interp(linear, self.times_buf, self.avg_colors_buf)
-            
+
             # calculate deviation value-wise
             self.deviation = interp - self.progressive_mean(interp)
-            
+
             # fourier transform
             self.fourier = np.abs(np.fft.rfft(self.deviation))
-            
+
             # create linear frequencies array
             self.frequencies = self.fps / num_samples * np.arange(num_samples / 2 + 1) * 60.
-            
+
             # create filter for a normal bpm (we don't want a bpm of 3000 because your face is lit by a holy strobe light)
             pos = np.where((self.frequencies > BPM_LOW) & (self.frequencies < BPM_HIGH))
-            
+
             try:
                 # filter out the values
                 self.frequencies = self.frequencies[pos]
@@ -284,20 +286,20 @@ class ImageProcessor():
                 else:
                     frequencies = self.frequencies
                     fourier = self.fourier
-                
+
                 # find index of freq with the biggest intensity
                 # it'll be the bpm
                 self.bpmpos = np.argmax(fourier)
                 self.bpm = frequencies[self.bpmpos]
-                
+
                 # store it
                 self.bpm_buf.append(self.bpm)
-                
+
                 # calculate the corrected bpm taking in account the previous values
                 self.cor_bpm = self.progressive_mean(self.bpm_buf)
                 text("d=%.3f" % self.deviation, 20, 120)
             except:
                 pass
-            
+
             # calculate remaining time until full buffer
             self.gap = (self.buf_size - num_samples) / self.fps
