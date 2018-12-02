@@ -141,7 +141,7 @@ class ImageProcessor():
                                                          35)
 
         # we like the green channel more
-        weights = [1.35, 2.6, 1]
+        weights = [1.15, 2.9, 0.8]
 
         return sum(weight * np.mean(slice[:, :, c]) for c, weight in enumerate(weights)) / sum(weights)
 
