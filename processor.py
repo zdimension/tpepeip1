@@ -115,7 +115,7 @@ class ImageProcessor():
     def progressive_mean(self, arr):
         """take a "progressive" mean, i.e. values are more accounted for the more recent they are, on a sqrt scale"""
         coeffs = [sqrt((x + len(arr) / 100) / (len(arr) + len(arr) / 100)) for x in range(1, len(arr) + 1)]
-        return np.average(arr, weights=coeffs)
+        return sum(x * c for x, c in zip(arr, coeffs)) / sum(coeffs)
 
     def get_subpicture(self, rect):
         """get "slice" of picture"""

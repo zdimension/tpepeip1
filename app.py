@@ -110,7 +110,11 @@ class TheApp():
         self.text_row = 0
 
         self.proc.input = frame
-        self.proc.execute(self.text)
+        try:
+            self.proc.execute(self.text)
+        except:
+            raise
+            self.proc.output = self.proc.input
 
         lines = [
             ("l = lock face", self.proc.lock_face),
