@@ -90,6 +90,12 @@ class TheApp():
         self.text(text, 20, int(30 + self.text_row * 30), font=FONT_SERIF_SMALL, frame=frame, col=col)
         self.text_row += 1
 
+    def get_width(self, text):
+        if type(text) != str:
+            text = text[0]
+
+        return cv2.getTextSize(text, FONT_SERIF_SMALL, self.font_size * SIZE_NORMAL, 2)[0][0]
+
     def app_loop(self):
         frame = self.camera.frame()
 
@@ -119,24 +125,24 @@ class TheApp():
 
         lines = [
             ("l = lock face", self.proc.lock_face),
-            "c = next camera (if usb)" if self.cam_type == "usb" else None,
+            ("c = next camera (if usb)" if self.cam_type == "usb" else None, None),
             ("s = show infos (fps, ...)", self.infos),
             ("d = toggle de-noise", self.proc.denoise),
             ("h = toggle noisy high-bpm filter", self.proc.highbpm),
             ("i = show enhanced color intensity", self.proc.colorify),
-            "+ - = change zoom",
-            "esc = exit"
+            ("+ - = change zoom", None),
+            ("esc = exit", None)
         ]
 
-        keys_frame = get_frame(500, 20 + len(lines) * 30)
+        keys_frame = get_frame(40 + max([(l[0], self.get_width(l[0])) for l in lines], key=lambda x: x[1])[1], 20 + len(lines) * 30)
 
-        for l in lines:
+        for l, ok in lines:
             if l is not None:
-                if type(l) != str:
-                    l, ok = l
-                    col = GREEN if ok else RED
-                else:
-                    col = WHITE
+                col = {
+                    None: WHITE,
+                    False: RED,
+                    True: GREEN
+                }[ok]
                 self.print(l, col=col, frame=keys_frame)
 
         cv2.imshow("infos", keys_frame)
