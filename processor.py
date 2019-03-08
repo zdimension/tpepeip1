@@ -61,6 +61,7 @@ class ImageProcessor():
         self.bpmpos = 0
 
         self.highbpm = True
+        self.current_high = BPM_NOISE_HIGH
 
     def clear_bufs(self):
         """clear the storage buffers"""
@@ -93,7 +94,7 @@ class ImageProcessor():
     def highbpm_toggle(self):
         """high bpm (noise) filtering"""
         self.highbpm = not self.highbpm
-
+        self.current_high = BPM_NOISE_HIGH if self.highbpm else BPM_HIGH
         return self.highbpm
 
     def colorify_toggle(self):
@@ -272,25 +273,17 @@ class ImageProcessor():
             self.frequencies = self.fps / num_samples * np.arange(num_samples / 2 + 1) * 60.
 
             # create filter for a normal bpm (we don't want a bpm of 3000 because your face is lit by a holy strobe light)
-            pos = np.where((self.frequencies > BPM_LOW) & (self.frequencies < BPM_HIGH))
+            pos = np.where((self.frequencies > BPM_LOW) & (self.frequencies < self.current_high))
 
             try:
                 # filter out the values
                 self.frequencies = self.frequencies[pos]
                 self.fourier = self.fourier[pos]
 
-                if self.highbpm:
-                    fpos = np.where(self.frequencies < BPM_NOISE_HIGH)
-                    frequencies = self.frequencies[fpos]
-                    fourier = self.fourier[fpos]
-                else:
-                    frequencies = self.frequencies
-                    fourier = self.fourier
-
                 # find index of freq with the biggest intensity
                 # it'll be the bpm
-                self.bpmpos = np.argmax(fourier)
-                self.bpm = frequencies[self.bpmpos]
+                self.bpmpos = np.argmax(self.fourier)
+                self.bpm = self.frequencies[self.bpmpos]
 
                 # store it
                 self.bpm_buf.append(self.bpm)

@@ -220,7 +220,7 @@ class TheApp():
         graph_frame = get_frame(w, h)
         if list(self.proc.frequencies):
             x_min = BPM_LOW
-            x_max = BPM_HIGH
+            x_max = self.proc.current_high
             x_size = x_max - x_min
             y_min = 0
             y_max = max(self.proc.fourier)
@@ -229,10 +229,6 @@ class TheApp():
 
             cv2.line(graph_frame, fix_point((self.proc.bpm, y_min)),
                      fix_point((self.proc.bpm, self.proc.fourier[self.proc.bpmpos])), RED)
-
-            if self.proc.highbpm:
-                bx = round(fix_point((BPM_NOISE_HIGH, 0))[0])
-                cv2.line(graph_frame, (bx, y_min), (bx, h), RED, 3)
 
             spac = x_target / 12
             val_spac = x_size / 12
