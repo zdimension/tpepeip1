@@ -118,11 +118,11 @@ class ImageProcessor():
         coeffs = [sqrt((x + len(arr) / 100) / (len(arr) + len(arr) / 100)) for x in range(1, len(arr) + 1)]
         return sum(x * c for x, c in zip(arr, coeffs)) / sum(coeffs)
 
-    def get_subpicture(self, rect):
+    def get_subpicture(self, rect, inp=None):
         """get "slice" of picture"""
         x, y, w, h = rect
 
-        return self.input[y:y + h, x:x + w, :]
+        return (inp if inp else self.input)[y:y + h, x:x + w, :]
 
     def calc_mean_color(self, rect):
         """calculate mean color in sub rectangle"""
@@ -142,7 +142,8 @@ class ImageProcessor():
                                                          35)
 
         # we like the green channel more
-        weights = [1.15, 2.9, 0.8]
+        #weights = [1.15, 2.9, 0.8]
+        weights = [0, 0.85, 0.4]
 
         return sum(weight * np.mean(slice[:, :, c]) for c, weight in enumerate(weights)) / sum(weights)
 
