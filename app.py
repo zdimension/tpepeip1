@@ -1,4 +1,5 @@
 import itertools
+from collections import defaultdict
 from sys import exit
 
 import cv2
@@ -56,7 +57,7 @@ class TheApp():
         self.font_size = 1
         self.text_color = WHITE
         self.zoom = 1
-        self.last_y_max = 0
+        self.last_y_max = defaultdict(int)
         self.keys = {
             "c": self.next_camera,
             "s": self.show_infos,
@@ -149,6 +150,55 @@ class TheApp():
 
         self.handle_keystroke()
 
+    def fix_point(self, p, x_min, x_max, y_min, y_max, x_target, y_target, x_off, y_off):
+        x, y = p
+        # values starting at 0
+        x_0 = x - x_min
+        y_0 = y - y_min
+
+        # values normalized (between 0 and 1) ; invert Y orientation
+        x_n = x_0 / (x_max - x_min)
+        y_n = 1 - y_0 / (y_max - y_min)
+
+        # values fixed in their target size
+        x_f = x_n * x_target
+        y_f = y_n * y_target
+
+        # final values
+        x = x_off + int(round(x_f))
+        y = y_off + int(round(y_f))
+        return x, y
+
+    x_off = 20
+    y_off = 40
+
+    def draw_xy(self, x, y, x_min, x_max, frame, name):
+        y_max_smoothing = 0.5
+        h, w = 300, 600
+
+        x_size = x_max - x_min
+
+
+        y_min, y_max = min(y), max(y)
+        y_max = y_max_smoothing * y_max + self.last_y_max[name] * (1 - y_max_smoothing)
+        self.last_y_max[name] = y_max
+        y_min = 0
+        y_size = y_max - y_min
+
+        y_margin = 20
+
+        x_target = w - 2 * self.x_off
+        y_target = h - 2 * self.y_off - y_margin
+
+        def fix(p):
+            return self.fix_point(p, x_min, x_max, y_min, y_max, x_target, y_target, self.x_off, self.y_off)
+
+        points = np.array(list(map(fix, zip(x, y))), dtype=np.int32)
+
+        cv2.polylines(frame, [points], False, WHITE, lineType=cv2.LINE_AA)
+
+        return fix, (x_target, y_target)
+
     def display_infos(self):
         self.text("%.0f bpm" % self.proc.cor_bpm, 15, 50, size=SIZE_BIG)
         self.text_row += SIZE_BIG / SIZE_SMALL
@@ -166,45 +216,10 @@ class TheApp():
             x_min = BPM_LOW
             x_max = BPM_HIGH
             x_size = x_max - x_min
-            x_off = 20
-
-            y_min, y_max = min(self.proc.fourier), max(self.proc.fourier)
-            y_max = y_max_smoothing * y_max + self.last_y_max * (1 - y_max_smoothing)
-            self.last_y_max = y_max
             y_min = 0
-            y_size = y_max - y_min
-            y_off = 40
-            y_margin = 20
+            y_max = max(self.proc.fourier)
 
-            x_target = w - 2 * x_off
-            y_target = h - 2 * y_off - y_margin
-
-            def fix_point(p):
-                x, y = p
-                # values starting at 0
-                x_0 = x - x_min
-                y_0 = y - y_min
-
-                # values normalized (between 0 and 1) ; invert Y orientation
-                x_n = x_0 / x_size
-                y_n = 1 - y_0 / y_size
-
-                # values fixed in their target size
-                x_f = x_n * x_target
-                y_f = y_n * y_target
-
-                # final values
-                x = x_off + int(round(x_f))
-                y = y_off + int(round(y_f))
-                return x, y
-
-            points = np.array(list(map(fix_point, (zip(self.proc.frequencies, self.proc.fourier)))), dtype=np.int32)
-
-            # tuples = zip(points, points[1:])
-            # for (p1, p2) in tuples:
-            #    cv2.line(graph_frame, fix_point(p1), fix_point(p2), WHITE, lineType=cv2.LINE_AA)
-
-            cv2.polylines(graph_frame, [points], False, WHITE, lineType=cv2.LINE_AA)
+            fix_point, (x_target, _) = self.draw_xy(self.proc.frequencies, self.proc.fourier, x_min, x_max, graph_frame, "fourier")
 
             cv2.line(graph_frame, fix_point((self.proc.bpm, y_min)),
                      fix_point((self.proc.bpm, self.proc.fourier[self.proc.bpmpos])), RED)
@@ -216,7 +231,7 @@ class TheApp():
             spac = x_target / 12
             val_spac = x_size / 12
             for i in range(12):
-                cv2.putText(graph_frame, "%.0f" % (i * val_spac + x_min), (round(x_off + i * spac), h - 30),
+                cv2.putText(graph_frame, "%.0f" % (i * val_spac + x_min), (round(self.x_off + i * spac), h - 30),
                             cv2.FONT_HERSHEY_PLAIN, 1, WHITE, lineType=cv2.LINE_AA)
 
             cv2.putText(graph_frame, "%.0f" % self.proc.bpm, (round(fix_point((self.proc.bpm, 0))[0]), h - 10),
