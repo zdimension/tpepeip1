@@ -267,7 +267,8 @@ class ImageProcessor():
             self.deviation = interp - self.progressive_mean(interp)
 
             # fourier transform
-            self.fourier = np.abs(np.fft.rfft(self.deviation))
+            fourier_raw = np.fft.rfft(self.deviation)
+            self.fourier = np.abs(fourier_raw)
 
             # create linear frequencies array
             self.frequencies = self.fps / num_samples * np.arange(num_samples / 2 + 1) * 60.
@@ -291,6 +292,15 @@ class ImageProcessor():
                 # calculate the corrected bpm taking in account the previous values
                 self.cor_bpm = self.progressive_mean(self.bpm_buf)
                 text("d=%.3f" % self.deviation, 20, 120)
+
+                if self.colorify:
+                    delta = 0.45 * (np.sin(np.angle(fourier_raw)) + 1.) + 0.1
+                    new_forehead = self.get_subpicture(forehead)
+                    self.draw_at(cv2.merge([
+                        delta * new_forehead[:, :, 0],
+                        delta * new_forehead[:, :, 0] + (1 - delta) * self.get_subpicture(forehead, self.input_g),
+                        delta * new_forehead[:, :, 0]
+                    ]), forehead)
             except:
                 pass
 
