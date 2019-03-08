@@ -206,7 +206,7 @@ class TheApp():
         return fix, (x_target, y_target)
 
     def display_infos(self):
-        self.text("%.0f bpm" % self.proc.cor_bpm, 15, 50, size=SIZE_BIG)
+        self.text(("%.0f bpm" % self.proc.cor_bpm) if self.proc.gap <= 0 else "?? bpm", 15, 50, size=SIZE_BIG)
         self.text_row += SIZE_BIG / SIZE_SMALL
         self.print("%.0f bpm (raw)" % self.proc.bpm)
         self.print("%.0f fps" % self.proc.fps)
