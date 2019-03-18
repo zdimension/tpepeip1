@@ -182,7 +182,7 @@ class ImageProcessor():
         """process the image"""
         self.output = self.input
 
-        self.input_buf.append(self.input)
+        self.input_buf.append(self.input)# todo!!!!!!
         self.resize_bufs()
 
         # fancy progress indicator
@@ -246,7 +246,7 @@ class ImageProcessor():
         if num_samples > MIN_SAMPLE_COUNT:
             # bounds of time buffer
             time_start, time_end = self.times_buf[0], self.times_buf[-1]
-            num_samples = len(self.times_buf)
+            num_samples = len(self.times_buf) # todo
 
             # calculate fps with smoothing
             self.last_fps = self.fps
