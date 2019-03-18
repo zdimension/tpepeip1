@@ -10,11 +10,11 @@ from helper import WHITE, BLACK, get_frame, GREEN, RED, BPM_LOW, BPM_HIGH, BPM_N
 from logger import info, error
 from processor import ImageProcessor
 
-SIZE_NORMAL = 1.0
-SIZE_SMALL = 0.75
+SIZE_NORMAL = 0.75
+SIZE_SMALL = 0.5
 SIZE_BIG = 1.5
-FONT_SERIF = cv2.FONT_HERSHEY_COMPLEX
-FONT_SERIF_SMALL = cv2.FONT_HERSHEY_COMPLEX_SMALL
+FONT_SERIF = cv2.FONT_HERSHEY_TRIPLEX
+FONT_SERIF_SMALL = cv2.FONT_HERSHEY_TRIPLEX
 
 
 class TheApp():
@@ -121,7 +121,6 @@ class TheApp():
             self.proc.execute(self.text)
         except:
             raise
-            self.proc.output = self.proc.input
 
         lines = [
             ("l = lock face", self.proc.lock_face),
@@ -130,6 +129,7 @@ class TheApp():
             ("d = toggle de-noise", self.proc.denoise),
             ("h = toggle noisy high-bpm filter", self.proc.highbpm),
             ("i = show enhanced color intensity", self.proc.colorify),
+            ("x = clear data buffers", None),
             ("+ - = change zoom", None),
             ("esc = exit", None)
         ]
@@ -207,7 +207,7 @@ class TheApp():
 
     def display_infos(self):
         self.text(("%.0f bpm" % self.proc.cor_bpm) if self.proc.gap <= 0 else "?? bpm", 15, 50, size=SIZE_BIG)
-        self.text_row += SIZE_BIG / SIZE_SMALL
+        self.text_row += SIZE_BIG / SIZE_NORMAL
         self.print("%.0f bpm (raw)" % self.proc.bpm)
         self.print("%.0f fps" % self.proc.fps)
         self.print("d = %.3f" % self.proc.deviation[-1])

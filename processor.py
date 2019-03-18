@@ -13,6 +13,8 @@ import cv2
 from helper import *
 
 # limit of maximum shift between two faces
+from logger import error
+
 SHIFT_THRESHOLD = 5
 
 # min sample count before we can start bothering doing the computations and expect good results
@@ -122,7 +124,7 @@ class ImageProcessor():
         """get "slice" of picture"""
         x, y, w, h = rect
 
-        return (inp if inp else self.input)[y:y + h, x:x + w, :]
+        return (inp if inp is not None else self.input)[y:y + h, x:x + w]
 
     def calc_mean_color(self, rect):
         """calculate mean color in sub rectangle"""
@@ -180,9 +182,9 @@ class ImageProcessor():
 
     def execute(self, text):
         """process the image"""
-        self.output = self.input
+        self.output = self.input.copy()
 
-        self.input_buf.append(self.input)# todo!!!!!!
+        self.input_buf.append(self.input)
         self.resize_bufs()
 
         # fancy progress indicator
@@ -216,16 +218,11 @@ class ImageProcessor():
             return
 
         # good-ish numbers, after trial and error
-        forehead = self.get_slice(0.5, 0.15, 0.38, 0.14)
+        forehead = self.get_slice(0.5, 0.15, 0.30, 0.14)
 
-        # draw rects around face and forehead
-        self.rect(*self.face, BLUE)
-        self.rect(*forehead, GREEN)
 
-        text("Face", *self.face[:2], BLUE)
-        text("Forehead", *forehead[:2], GREEN)
 
-        if self.colorify:
+        if False and self.colorify:
             new_forehead = self.get_subpicture(forehead)
             left = 100
             total_width = 256
@@ -246,7 +243,6 @@ class ImageProcessor():
         if num_samples > MIN_SAMPLE_COUNT:
             # bounds of time buffer
             time_start, time_end = self.times_buf[0], self.times_buf[-1]
-            num_samples = len(self.times_buf) # todo
 
             # calculate fps with smoothing
             self.last_fps = self.fps
@@ -292,18 +288,26 @@ class ImageProcessor():
 
                 # calculate the corrected bpm taking in account the previous values
                 self.cor_bpm = self.progressive_mean(self.bpm_buf)
-                text("d=%.3f" % self.deviation, 20, 120)
 
                 if self.colorify:
-                    delta = 0.45 * (np.sin(np.angle(fourier_raw)) + 1.) + 0.1
+                    delta = 0.45 * (np.sin(np.angle(fourier_raw)[self.bpmpos]) + 1.) + 0.1
                     new_forehead = self.get_subpicture(forehead)
+                    new_forehead_g = self.get_subpicture(forehead, self.input_g)
                     self.draw_at(cv2.merge([
                         delta * new_forehead[:, :, 0],
-                        delta * new_forehead[:, :, 0] + (1 - delta) * self.get_subpicture(forehead, self.input_g),
-                        delta * new_forehead[:, :, 0]
+                        delta * new_forehead[:, :, 1] + (1 - delta) * new_forehead_g,
+                        delta * new_forehead[:, :, 2]
                     ]), forehead)
-            except:
+            except Exception as e:
+                error(e)
                 pass
 
             # calculate remaining time until full buffer
             self.gap = (self.buf_size - num_samples) / self.fps
+
+        # draw rects around face and forehead
+        self.rect(*self.face, BLUE)
+        self.rect(*forehead, GREEN)
+
+        text("Face", *self.face[:2], BLUE)
+        text("Forehead", *forehead[:2], GREEN)
