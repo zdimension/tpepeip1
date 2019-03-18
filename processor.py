@@ -24,7 +24,7 @@ MIN_SAMPLE_COUNT = 15
 FPS_SMOOTHING = 0.8
 
 
-class ImageProcessor():
+class ImageProcessor:
     def __init__(self, cascade):
         self.last_fps = 0
         self.fps = 0
@@ -71,12 +71,6 @@ class ImageProcessor():
         self.times_buf = []
         self.bpm_buf = []
 
-    def train_toggle(self):
-        """sets if trained"""
-        self.trained = not self.trained
-
-        return self.trained
-
     def rect(self, x, y, w, h, col=WHITE):
         """wrapper for opencv"""
         cv2.rectangle(self.output, (x, y), (x + w, y + h), col, 2)
@@ -115,7 +109,8 @@ class ImageProcessor():
 
         return decal
 
-    def progressive_mean(self, arr):
+    @staticmethod
+    def progressive_mean(arr):
         """take a "progressive" mean, i.e. values are more accounted for the more recent they are, on a sqrt scale"""
         coeffs = [sqrt((x + len(arr) / 100) / (len(arr) + len(arr) / 100)) for x in range(1, len(arr) + 1)]
         return sum(x * c for x, c in zip(arr, coeffs)) / sum(coeffs)
@@ -144,7 +139,7 @@ class ImageProcessor():
                                                          35)
 
         # we like the green channel more
-        #weights = [1.15, 2.9, 0.8]
+        # weights = [1.15, 2.9, 0.8]
         weights = [0, 0.85, 0.4]
 
         return sum(weight * np.mean(slice[:, :, c]) for c, weight in enumerate(weights)) / sum(weights)
@@ -195,9 +190,9 @@ class ImageProcessor():
 
         if not self.lock_face:
             # b&w for face detection classifier
-            self.input_g = cv2.equalizeHist(cv2.cvtColor(self.input, cv2.COLOR_BGR2GRAY))
+            input_g = cv2.equalizeHist(cv2.cvtColor(self.input, cv2.COLOR_BGR2GRAY))
 
-            detect = list(self.classifier.detectMultiScale(self.input_g, minNeighbors=4, minSize=(50, 50),
+            detect = list(self.classifier.detectMultiScale(input_g, minNeighbors=4, minSize=(50, 50),
                                                            flags=cv2.CASCADE_SCALE_IMAGE))
 
             if detect:
@@ -219,18 +214,6 @@ class ImageProcessor():
 
         # good-ish numbers, after trial and error
         forehead = self.get_slice(0.5, 0.15, 0.30, 0.14)
-
-
-
-        if False and self.colorify:
-            new_forehead = self.get_subpicture(forehead)
-            left = 100
-            total_width = 256
-            curve_width = total_width - 2 * left
-            alpha = total_width / curve_width
-            beta = -left * alpha
-            new_forehead = cv2.convertScaleAbs(new_forehead, None, alpha, beta)
-            self.draw_at(new_forehead, forehead)
 
         # take average color of forehead region
         fh_average = self.calc_mean_color(forehead)
@@ -292,7 +275,7 @@ class ImageProcessor():
                 if self.colorify:
                     delta = 0.45 * (np.sin(np.angle(fourier_raw)[self.bpmpos]) + 1.) + 0.1
                     new_forehead = self.get_subpicture(forehead)
-                    new_forehead_g = self.get_subpicture(forehead, self.input_g)
+                    new_forehead_g = self.get_subpicture(forehead, input_g)
                     self.draw_at(cv2.merge([
                         delta * new_forehead[:, :, 0],
                         delta * new_forehead[:, :, 1] + (1 - delta) * new_forehead_g,

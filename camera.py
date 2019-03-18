@@ -10,7 +10,7 @@ import cv2
 from logger import *
 
 
-class Camera():
+class Camera:
     def __init__(self, path=0):
         self.path = path
         self.camera = cv2.VideoCapture(path)

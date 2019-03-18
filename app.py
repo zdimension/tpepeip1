@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 from camera import Camera
-from helper import WHITE, BLACK, get_frame, GREEN, RED, BPM_LOW, BPM_HIGH, BPM_NOISE_HIGH
+from helper import WHITE, BLACK, get_frame, GREEN, RED, BPM_LOW
 from logger import info, error
 from processor import ImageProcessor
 
@@ -17,7 +17,7 @@ FONT_SERIF = cv2.FONT_HERSHEY_TRIPLEX
 FONT_SERIF_SMALL = cv2.FONT_HERSHEY_TRIPLEX
 
 
-class TheApp():
+class TheApp:
     def __init__(self, cmdargs):
         info("Starting app with args " + str(cmdargs))
         self.cam_type = cmdargs.type
@@ -56,6 +56,7 @@ class TheApp():
         self.proc = ImageProcessor(cmdargs.classifier)
         self.font_size = 1
         self.text_color = WHITE
+        self.text_row = 0
         self.zoom = 1
         self.last_y_max = defaultdict(int)
         self.keys = {
@@ -134,7 +135,8 @@ class TheApp():
             ("esc = exit", None)
         ]
 
-        keys_frame = get_frame(40 + max([(l[0], self.get_width(l[0])) for l in lines], key=lambda x: x[1])[1], 20 + len(lines) * 30)
+        keys_frame = get_frame(40 + max([(l[0], self.get_width(l[0])) for l in lines], key=lambda x: x[1])[1],
+                               20 + len(lines) * 30)
 
         for l, ok in lines:
             if l is not None:
@@ -156,7 +158,8 @@ class TheApp():
 
         self.handle_keystroke()
 
-    def fix_point(self, p, x_min, x_max, y_min, y_max, x_target, y_target, x_off, y_off):
+    @staticmethod
+    def fix_point(p, x_min, x_max, y_min, y_max, x_target, y_target, x_off, y_off):
         x, y = p
         # values starting at 0
         x_0 = x - x_min
@@ -182,14 +185,10 @@ class TheApp():
         y_max_smoothing = 0.5
         h, w = 300, 600
 
-        x_size = x_max - x_min
-
-
         y_min, y_max = min(y), max(y)
         y_max = y_max_smoothing * y_max + self.last_y_max[name] * (1 - y_max_smoothing)
         self.last_y_max[name] = y_max
         y_min = 0
-        y_size = y_max - y_min
 
         y_margin = 20
 
@@ -213,9 +212,7 @@ class TheApp():
         self.print("d = %.3f" % self.proc.deviation[-1])
         if self.proc.gap:
             self.print("wait %.0fs" % self.proc.gap)
-        # plotXY([[self.proc.frequencies, self.proc.fourier]],size=(300, 600), name="data", labels=[True], showmax=["bpm"], label_ndigits=[0], showmax_digits=[1], skip=[3])
-        # return
-        y_max_smoothing = 0.5
+
         h, w = 300, 600
         graph_frame = get_frame(w, h)
         if list(self.proc.frequencies):
@@ -223,9 +220,9 @@ class TheApp():
             x_max = self.proc.current_high
             x_size = x_max - x_min
             y_min = 0
-            y_max = max(self.proc.fourier)
 
-            fix_point, (x_target, _) = self.draw_xy(self.proc.frequencies, self.proc.fourier, x_min, x_max, graph_frame, "fourier")
+            fix_point, (x_target, _) = self.draw_xy(self.proc.frequencies, self.proc.fourier, x_min, x_max, graph_frame,
+                                                    "fourier")
 
             cv2.line(graph_frame, fix_point((self.proc.bpm, y_min)),
                      fix_point((self.proc.bpm, self.proc.fourier[self.proc.bpmpos])), RED)
