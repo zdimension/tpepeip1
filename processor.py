@@ -14,6 +14,7 @@ from helper import *
 
 # limit of maximum shift between two faces
 from logger import error
+from collections import deque
 
 SHIFT_THRESHOLD = 5
 
@@ -29,22 +30,22 @@ class ImageProcessor:
         self.last_fps = 0
         self.fps = 0
         self.buf_size = 256
-        self.avg_colors_buf = []
+        self.avg_colors_buf = deque(maxlen=self.buf_size)
 
         self.lock_face = False
 
         self.input = np.zeros((10, 10))
         self.output = np.zeros((10, 10))
 
-        self.input_buf = []
         self.input_buf_size = 5
+        self.input_buf = deque(maxlen=self.input_buf_size)
         self.denoise = False
 
         self.colorify = False
 
         self.classifier = cv2.CascadeClassifier(cascade)
 
-        self.times_buf = []
+        self.times_buf = deque(maxlen=self.buf_size)
         self.start_time = time.time()
 
         self.face = [0, 0, 1, 1]
@@ -58,7 +59,7 @@ class ImageProcessor:
         self.buf_state = 0
         self.deviation = [0]
 
-        self.bpm_buf = [60]
+        self.bpm_buf = deque([60], maxlen=self.buf_size)
         self.cor_bpm = 0
         self.bpmpos = 0
 
@@ -67,9 +68,9 @@ class ImageProcessor:
 
     def clear_bufs(self):
         """clear the storage buffers"""
-        self.avg_colors_buf = []
-        self.times_buf = []
-        self.bpm_buf = []
+        self.avg_colors_buf.clear()
+        self.times_buf.clear()
+        self.bpm_buf.clear()
 
     def rect(self, x, y, w, h, col=WHITE):
         """wrapper for opencv"""
@@ -168,10 +169,6 @@ class ImageProcessor:
 
     def resize_bufs(self):
         """resize the storage buffers so they don't go above the buffer size"""
-        self.avg_colors_buf = self.avg_colors_buf[-self.buf_size:]
-        self.times_buf = self.times_buf[-self.buf_size:]
-        self.bpm_buf = self.bpm_buf[-self.buf_size:]
-        self.input_buf = self.input_buf[-self.input_buf_size:]
         if self.input_buf:
             self.input_buf = [x for x in self.input_buf if x.shape == self.input_buf[-1].shape]
 
