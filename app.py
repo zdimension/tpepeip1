@@ -92,6 +92,8 @@ class TheApp:
         self.text_row += 1
 
     def get_width(self, text):
+        if text is None:
+            return 0
         if type(text) != str:
             text = text[0]
 
