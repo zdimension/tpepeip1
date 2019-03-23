@@ -98,7 +98,7 @@ class TheApp:
         return cv2.getTextSize(text, FONT_SERIF_SMALL, self.font_size * SIZE_NORMAL, 2)[0][0]
 
     def app_loop(self):
-        frame = self.camera.frame()
+        frame = self.camera.get_frame()
 
         if self.rotate == 90:
             frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
@@ -123,36 +123,36 @@ class TheApp:
         except:
             raise
 
-        lines = [
-            ("l = lock face", self.proc.lock_face),
-            ("c = next camera (if usb)" if self.cam_type == "usb" else None, None),
-            ("s = show infos (fps, ...)", self.infos),
-            ("d = toggle de-noise", self.proc.denoise),
-            ("h = toggle noisy high-bpm filter", self.proc.highbpm),
-            ("i = show enhanced color intensity", self.proc.colorify),
-            ("x = clear data buffers", None),
-            ("+ - = change zoom", None),
-            ("esc = exit", None)
-        ]
-
-        keys_frame = get_frame(40 + max([(l[0], self.get_width(l[0])) for l in lines], key=lambda x: x[1])[1],
-                               20 + len(lines) * 30)
-
-        for l, ok in lines:
-            if l is not None:
-                col = {
-                    None: WHITE,
-                    False: RED,
-                    True: GREEN
-                }[ok]
-                self.print(l, col=col, frame=keys_frame)
-
-        cv2.imshow("infos", keys_frame)
-
-        self.text_row = 0
-
         if self.infos:
-            self.display_infos()
+            lines = [
+                ("l = lock face", self.proc.lock_face),
+                ("c = next camera (if usb)" if self.cam_type == "usb" else None, None),
+                ("s = show infos (fps, ...)", self.infos),
+                ("d = toggle de-noise", self.proc.denoise),
+                ("h = toggle noisy high-bpm filter", self.proc.highbpm),
+                ("i = show enhanced color intensity", self.proc.colorify),
+                ("x = clear data buffers", None),
+                ("+ - = change zoom", None),
+                ("esc = exit", None)
+            ]
+
+            keys_frame = get_frame(40 + max([(l[0], self.get_width(l[0])) for l in lines], key=lambda x: x[1])[1],
+                                   20 + len(lines) * 30)
+
+            for l, ok in lines:
+                if l is not None:
+                    col = {
+                        None: WHITE,
+                        False: RED,
+                        True: GREEN
+                    }[ok]
+                    self.print(l, col=col, frame=keys_frame)
+
+            cv2.imshow("infos", keys_frame)
+
+            self.text_row = 0
+
+        self.display_infos()
 
         cv2.imshow("processed", self.proc.output)
 
