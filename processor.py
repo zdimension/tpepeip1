@@ -47,6 +47,7 @@ class ImageProcessor:
 
         self.times_buf = deque(maxlen=self.buf_size)
         self.start_time = time.time()
+        self.input_time = self.start_time
 
         self.face = [0, 0, 1, 1]
 
@@ -183,7 +184,7 @@ class ImageProcessor:
         self.buf_state += 1
         self.buf_state %= self.buf_size
 
-        self.times_buf.append(time.time() - self.start_time)
+        self.times_buf.append(self.input_time - self.start_time)
 
         if not self.lock_face:
             # b&w for face detection classifier

@@ -37,7 +37,7 @@ class Camera:
         while self.connected:
             try:
                 #self.queue.put(self.camera.read()[1])
-                self.frame = self.camera.read()[1]
+                self.frame = (time.time(), self.camera.read()[1])
             except:
                 error("An error occured while reading the frame")
                 pass

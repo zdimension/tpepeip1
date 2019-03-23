@@ -100,7 +100,7 @@ class TheApp:
         return cv2.getTextSize(text, FONT_SERIF_SMALL, self.font_size * SIZE_NORMAL, 2)[0][0]
 
     def app_loop(self):
-        frame = self.camera.get_frame()
+        ftime, frame = self.camera.get_frame()
 
         if self.rotate == 90:
             frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
@@ -120,6 +120,7 @@ class TheApp:
         self.text_row = 0
 
         self.proc.input = frame
+        self.proc.input_time = ftime
         try:
             self.proc.execute(self.text)
         except:
