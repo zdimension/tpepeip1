@@ -43,6 +43,7 @@ class Camera:
                 pass
 
     def dispose(self):
+        self.connected = False
         self.camera.release()
 
     def get_frame(self):
