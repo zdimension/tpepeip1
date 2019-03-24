@@ -83,8 +83,9 @@ class TheApp:
         """wrapper for opencv"""
         if frame is None:
             frame = self.proc.output
-        for ox, oy in itertools.product([-1, 1], repeat=2):
-            cv2.putText(frame, text, (x + ox, y + oy), font, self.font_size * size, BLACK, 2, cv2.LINE_AA)
+        #for ox, oy in itertools.product([-1, 1], repeat=2):
+        #    cv2.putText(frame, text, (x + ox, y + oy), font, self.font_size * size, BLACK, 2, cv2.LINE_AA)
+        #cv2.putText(frame, text, (x, y), font, self.font_size * size, BLACK, 4, lineType=cv2.LINE_AA)
         cv2.putText(frame, text, (x, y), font, self.font_size * size, col or self.text_color, lineType=cv2.LINE_AA)
 
     def print(self, text, frame=None, col=None):
