@@ -141,7 +141,7 @@ class TheApp:
             ]
 
             keys_frame = get_frame(40 + max([(l[0], self.get_width(l[0])) for l in lines], key=lambda x: x[1])[1],
-                                   20 + len(lines) * 30)
+                                   20 + sum(1 for l in lines if l) * 30)
 
             for l, ok in lines:
                 if l is not None:
