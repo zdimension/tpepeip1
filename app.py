@@ -54,6 +54,7 @@ class TheApp:
         self.w, self.h, self.channels = 0, 0, 3
         self.infos = True
         self.proc = ImageProcessor(cmdargs.classifier)
+        self.proc.text = self.text
         self.font_size = 1
         self.text_color = WHITE
         self.text_row = 0

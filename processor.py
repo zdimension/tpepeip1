@@ -35,6 +35,7 @@ class ImageProcessor:
         self.lock_face = False
 
         self.input = np.zeros((10, 10))
+        self.input_g = np.zeros((10, 10))
         self.output = np.zeros((10, 10))
 
         self.input_buf_size = 5
@@ -50,11 +51,13 @@ class ImageProcessor:
         self.input_time = self.start_time
 
         self.face = [0, 0, 1, 1]
+        self.forehead = [0, 0, 1, 1]
 
         self.last_centre = np.array([0, 0])
 
         self.frequencies = []
         self.fourier = []
+        self.fourier_raw = []
         self.bpm = 0
         self.gap = 0
         self.buf_state = 0
@@ -173,10 +176,28 @@ class ImageProcessor:
         if self.input_buf:
             self.input_buf = [x for x in self.input_buf if x.shape == self.input_buf[-1].shape]
 
+    def search_face(self):
+        # b&w for face detection classifier
+        detect = list(self.classifier.detectMultiScale(self.input_g, minNeighbors=4, minSize=(50, 50),
+                                                       flags=cv2.CASCADE_SCALE_IMAGE))
+
+        if detect:
+            # take the biggest one (by size)
+            biggest = sorted(detect, reverse=True, key=lambda f: f[-1] * f[-2])[0]
+
+            # if difference between detected and current one is bigger than threshold
+            # then set current one as detected
+            # otherwise, consider it's still the same face, but only moved
+            if self.calc_shift(biggest) > SHIFT_THRESHOLD:
+                self.face = biggest
+                self.input_buf.clear()
+                # good-ish numbers, after trial and error
+                self.forehead = self.get_slice(0.5, 0.15, 0.30, 0.14)
+
     def execute(self, text):
         """process the image"""
         self.output = self.input.copy()
-
+        self.input_g = cv2.equalizeHist(cv2.cvtColor(self.input, cv2.COLOR_BGR2GRAY))
         self.input_buf.append(self.input)
         self.resize_bufs()
 
@@ -187,22 +208,7 @@ class ImageProcessor:
         self.times_buf.append(self.input_time - self.start_time)
 
         if not self.lock_face:
-            # b&w for face detection classifier
-            input_g = cv2.equalizeHist(cv2.cvtColor(self.input, cv2.COLOR_BGR2GRAY))
-
-            detect = list(self.classifier.detectMultiScale(input_g, minNeighbors=4, minSize=(50, 50),
-                                                           flags=cv2.CASCADE_SCALE_IMAGE))
-
-            if detect:
-                # take the biggest one (by size)
-                biggest = sorted(detect, reverse=True, key=lambda f: f[-1] * f[-2])[0]
-
-                # if difference between detected and current one is bigger than threshold
-                # then set current one as detected
-                # otherwise, consider it's still the same face, but only moved
-                if self.calc_shift(biggest) > SHIFT_THRESHOLD:
-                    self.face = biggest
-                    self.input_buf.clear()
+            self.search_face()
 
         # if face is still default then set average to zero so shit doesnt hit the ceiling
         if set(self.face) == {0, 1}:
@@ -210,46 +216,16 @@ class ImageProcessor:
             self.resize_bufs()
             return
 
-        # good-ish numbers, after trial and error
-        forehead = self.get_slice(0.5, 0.15, 0.30, 0.14)
-
         # take average color of forehead region
-        fh_average = self.calc_mean_color(forehead)
+        fh_average = self.calc_mean_color(self.forehead)
         self.avg_colors_buf.append(fh_average)
 
         self.resize_bufs()
 
-        num_samples = len(self.times_buf)
+        if len(self.times_buf) > MIN_SAMPLE_COUNT:
+            self.calc_fps()
 
-        if num_samples > MIN_SAMPLE_COUNT:
-            # bounds of time buffer
-            time_start, time_end = self.times_buf[0], self.times_buf[-1]
-
-            # calculate fps with smoothing
-            self.last_fps = self.fps
-            dt = time_end - time_start
-            if dt:
-                fps = num_samples / dt
-                self.fps = fps * FPS_SMOOTHING + self.last_fps * (1 - FPS_SMOOTHING)
-
-            # interpolate the color data on a linear time space
-            linear = np.linspace(time_start, time_end, num_samples)
-
-            # filter out useless signals with hamming window
-            window = np.hamming(num_samples)
-
-            # interpolate that bitch
-            interp = window - np.interp(linear, self.times_buf, self.avg_colors_buf)
-
-            # calculate deviation value-wise
-            self.deviation = interp - self.progressive_mean(interp)
-
-            # fourier transform
-            fourier_raw = np.fft.rfft(self.deviation)
-            self.fourier = np.abs(fourier_raw)
-
-            # create linear frequencies array
-            self.frequencies = self.fps / num_samples * np.arange(num_samples / 2 + 1) * 60.
+            self.do_analysis()
 
             # create filter for a normal bpm (we don't want a bpm of 3000 because your face is lit by a holy strobe light)
             pos = np.where((self.frequencies > BPM_LOW) & (self.frequencies < self.current_high))
@@ -271,24 +247,61 @@ class ImageProcessor:
                 self.cor_bpm = self.progressive_mean(self.bpm_buf)
 
                 if self.colorify:
-                    delta = 0.45 * (np.sin(np.angle(fourier_raw)[self.bpmpos]) + 1.) + 0.1
-                    new_forehead = self.get_subpicture(forehead)
-                    new_forehead_g = self.get_subpicture(forehead, input_g)
-                    self.draw_at(cv2.merge([
-                        delta * new_forehead[:, :, 0],
-                        delta * new_forehead[:, :, 1] + (1 - delta) * new_forehead_g,
-                        delta * new_forehead[:, :, 2]
-                    ]), forehead)
+                    self.draw_colored()
+
             except Exception as e:
                 error(e)
                 pass
 
             # calculate remaining time until full buffer
-            self.gap = (self.buf_size - num_samples) / self.fps
+            self.gap = (self.buf_size - len(self.times_buf)) / self.fps
 
+        self.draw_rects()
+
+    def draw_colored(self):
+        delta = 0.45 * (np.sin(np.angle(self.fourier_raw)[self.bpmpos]) + 1.) + 0.1
+        new_forehead = self.get_subpicture(self.forehead)
+        new_forehead_g = self.get_subpicture(self.forehead, self.input_g)
+        self.draw_at(cv2.merge([
+            delta * new_forehead[:, :, 0],
+            delta * new_forehead[:, :, 1] + (1 - delta) * new_forehead_g,
+            delta * new_forehead[:, :, 2]
+        ]), self.forehead)
+
+    def draw_rects(self):
         # draw rects around face and forehead
         self.rect(*self.face, BLUE)
-        self.rect(*forehead, GREEN)
+        self.rect(*self.forehead, GREEN)
 
-        text("Face", *self.face[:2], BLUE)
-        text("Forehead", *forehead[:2], GREEN)
+        self.text("Face", *self.face[:2], BLUE)
+        self.text("Forehead", *self.forehead[:2], GREEN)
+
+    def calc_fps(self):
+        # calculate fps with smoothing
+        self.last_fps = self.fps
+        dt = self.times_buf[-1] - self.times_buf[0]
+        if dt:
+            fps = len(self.times_buf) / dt
+            self.fps = fps * FPS_SMOOTHING + self.last_fps * (1 - FPS_SMOOTHING)
+
+    def do_analysis(self):
+        num_samples = len(self.times_buf)
+
+        # interpolate the color data on a linear time space
+        linear = np.linspace(self.times_buf[0], self.times_buf[-1], num_samples)
+
+        # filter out useless signals with hamming window
+        window = np.hamming(num_samples)
+
+        # interpolate that bitch
+        interp = window - np.interp(linear, self.times_buf, self.avg_colors_buf)
+
+        # calculate deviation value-wise
+        self.deviation = interp - self.progressive_mean(interp)
+
+        # fourier transform
+        self.fourier_raw = np.fft.rfft(self.deviation)
+        self.fourier = np.abs(self.fourier_raw)
+
+        # create linear frequencies array
+        self.frequencies = self.fps / num_samples * np.arange(num_samples / 2 + 1) * 60.
