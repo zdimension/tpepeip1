@@ -16,6 +16,9 @@ from helper import *
 from logger import error
 from collections import deque
 
+
+import numba
+
 SHIFT_THRESHOLD = 5
 
 # min sample count before we can start bothering doing the computations and expect good results
@@ -114,11 +117,7 @@ class ImageProcessor:
 
         return decal
 
-    @staticmethod
-    def progressive_mean(arr):
-        """take a "progressive" mean, i.e. values are more accounted for the more recent they are, on a sqrt scale"""
-        coeffs = [sqrt((x + len(arr) / 100) / (len(arr) + len(arr) / 100)) for x in range(1, len(arr) + 1)]
-        return sum(x * c for x, c in zip(arr, coeffs)) / sum(coeffs)
+
 
     def get_subpicture(self, rect, inp=None):
         """get "slice" of picture"""
@@ -244,7 +243,7 @@ class ImageProcessor:
                 self.bpm_buf.append(self.bpm)
 
                 # calculate the corrected bpm taking in account the previous values
-                self.cor_bpm = self.progressive_mean(self.bpm_buf)
+                self.cor_bpm = progressive_mean(np.array(self.bpm_buf))
 
                 if self.colorify:
                     self.draw_colored()
@@ -285,23 +284,31 @@ class ImageProcessor:
             self.fps = fps * FPS_SMOOTHING + self.last_fps * (1 - FPS_SMOOTHING)
 
     def do_analysis(self):
-        num_samples = len(self.times_buf)
+        self.deviation, self.fourier_raw, self.fourier, self.frequencies = self.do_analysis_backend(list(self.times_buf), list(self.avg_colors_buf), self.fps)
+
+
+    @staticmethod
+    #@numba.jit(nopython=True)
+    def do_analysis_backend(times_buf, avg_colors_buf, fps):
+        num_samples = len(times_buf)
 
         # interpolate the color data on a linear time space
-        linear = np.linspace(self.times_buf[0], self.times_buf[-1], num_samples)
+        linear = np.linspace(times_buf[0], times_buf[-1], num_samples)
 
         # filter out useless signals with hamming window
         window = np.hamming(num_samples)
 
         # interpolate that bitch
-        interp = window - np.interp(linear, self.times_buf, self.avg_colors_buf)
+        interp = window - np.interp(linear, times_buf, avg_colors_buf)
 
         # calculate deviation value-wise
-        self.deviation = interp - self.progressive_mean(interp)
+        deviation = interp - progressive_mean(interp)
 
         # fourier transform
-        self.fourier_raw = np.fft.rfft(self.deviation)
-        self.fourier = np.abs(self.fourier_raw)
+        fourier_raw = np.fft.rfft(deviation)
+        fourier = np.abs(fourier_raw)
 
         # create linear frequencies array
-        self.frequencies = self.fps / num_samples * np.arange(num_samples / 2 + 1) * 60.
+        frequencies = fps / num_samples * np.arange(num_samples / 2 + 1) * 60.
+
+        return (deviation, fourier_raw, fourier, frequencies)
