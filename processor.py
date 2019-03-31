@@ -17,8 +17,6 @@ from logger import error
 from collections import deque
 
 
-import numba
-
 SHIFT_THRESHOLD = 5
 
 # min sample count before we can start bothering doing the computations and expect good results
@@ -32,7 +30,7 @@ class ImageProcessor:
     def __init__(self, cascade):
         self.last_fps = 0
         self.fps = 0
-        self.buf_size = 256
+        self.buf_size = 256*2
         self.avg_colors_buf = deque(maxlen=self.buf_size)
 
         self.lock_face = False
@@ -117,8 +115,6 @@ class ImageProcessor:
 
         return decal
 
-
-
     def get_subpicture(self, rect, inp=None):
         """get "slice" of picture"""
         x, y, w, h = rect
@@ -172,8 +168,10 @@ class ImageProcessor:
 
     def resize_bufs(self):
         """resize the storage buffers so they don't go above the buffer size"""
-        if self.input_buf:
-            self.input_buf = [x for x in self.input_buf if x.shape == self.input_buf[-1].shape]
+        if len(self.input_buf) > 1 and self.input_buf[-1].shape != self.input_buf[-2].shape:
+            self.input_buf.clear()
+        #if self.input_buf:
+        #    self.input_buf = [x for x in self.input_buf if x.shape == self.input_buf[-1].shape]
 
     def search_face(self):
         # b&w for face detection classifier
@@ -284,31 +282,23 @@ class ImageProcessor:
             self.fps = fps * FPS_SMOOTHING + self.last_fps * (1 - FPS_SMOOTHING)
 
     def do_analysis(self):
-        self.deviation, self.fourier_raw, self.fourier, self.frequencies = self.do_analysis_backend(list(self.times_buf), list(self.avg_colors_buf), self.fps)
-
-
-    @staticmethod
-    #@numba.jit(nopython=True)
-    def do_analysis_backend(times_buf, avg_colors_buf, fps):
-        num_samples = len(times_buf)
+        num_samples = len(self.times_buf)
 
         # interpolate the color data on a linear time space
-        linear = np.linspace(times_buf[0], times_buf[-1], num_samples)
+        linear = np.linspace(self.times_buf[0], self.times_buf[-1], num_samples)
 
         # filter out useless signals with hamming window
         window = np.hamming(num_samples)
 
         # interpolate that bitch
-        interp = window - np.interp(linear, times_buf, avg_colors_buf)
+        interp = window - np.interp(linear, self.times_buf, self.avg_colors_buf)
 
         # calculate deviation value-wise
-        deviation = interp - progressive_mean(interp)
+        self.deviation = interp - progressive_mean(interp)
 
         # fourier transform
-        fourier_raw = np.fft.rfft(deviation)
-        fourier = np.abs(fourier_raw)
+        self.fourier_raw = np.fft.rfft(self.deviation)
+        self.fourier = np.abs(self.fourier_raw)
 
         # create linear frequencies array
-        frequencies = fps / num_samples * np.arange(num_samples / 2 + 1) * 60.
-
-        return (deviation, fourier_raw, fourier, frequencies)
+        self.frequencies = self.fps / num_samples * np.arange(num_samples / 2 + 1) * 60.

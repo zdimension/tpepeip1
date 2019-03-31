@@ -259,7 +259,7 @@ class TheApp:
         info("Colorization " + ("enabled" if self.proc.colorify_toggle() else "disabled"))
 
     def handle_keystroke(self):
-        self.key = cv2.waitKey(50) & 0xFF
+        self.key = cv2.waitKey(1) & 0xFF
 
         if self.key == 0x1B:  # ascii ESC
             info("good bye")

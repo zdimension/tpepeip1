@@ -25,6 +25,7 @@ class Camera:
             info("Got after read")
             self.camera_shape = self.frame.shape
             self.connected = True
+            self.fps = self.camera.get(cv2.CAP_PROP_FPS)
         except:
             self.camera_shape = None
             self.connected = False
@@ -38,6 +39,8 @@ class Camera:
             try:
                 #self.queue.put(self.camera.read()[1])
                 self.frame = (time.time(), self.camera.read()[1])
+                if self.fps != 0:
+                    time.sleep(1 / self.fps)
             except:
                 error("An error occured while reading the frame")
                 pass
