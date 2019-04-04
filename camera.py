@@ -31,8 +31,8 @@ class Camera:
             self.connected = False
             error(f"Couldn't connect to camera {self.path}")
 
-        self.thread = Thread(target=self.read_frame)
-        self.thread.start()
+        #self.thread = Thread(target=self.read_frame)
+        #self.thread.start()
 
     def read_frame(self):
         while self.connected:
@@ -55,9 +55,9 @@ class Camera:
             raise None
 
         try:
-            #return self.camera.read()[1]
+            return time.time(), self.camera.read()[1]
             #return self.queue.get()
-            return self.frame
+            #return self.frame
         except:
             error("An error occured while reading the frame")
             exit()
